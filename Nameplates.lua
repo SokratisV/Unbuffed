@@ -17,18 +17,28 @@ local function getRow(plate)
     row:SetSize(1, 1)
     -- Above the nameplate art, so the icons aren't buried by the health bar.
     row:SetFrameLevel((plate:GetFrameLevel() or 0) + 10)
-    row.icons = {}
+    row.icons, row.labels = {}, {}
     plate.UnbuffedRow = row
     return row
 end
 
+-- Amber for "running out", so it reads as a warning rather than the plain
+-- full-colour icon that means "not buffed at all".
+local EXPIRING_TINT = { 1.0, 0.72, 0.15 }
+
 local function getIcon(row, i)
     local t = row.icons[i]
-    if t then return t end
+    if t then return t, row.labels[i] end
     t = row:CreateTexture(nil, "OVERLAY")
+    t:SetDrawLayer("OVERLAY", 0)
     t:SetTexCoord(0.07, 0.93, 0.07, 0.93)   -- trim the stock icon border
-    row.icons[i] = t
-    return t
+    -- Minutes left, drawn above the icon so a expiring buff says how urgent it is.
+    local fs = row:CreateFontString(nil, "OVERLAY")
+    fs:SetDrawLayer("OVERLAY", 2)
+    fs:SetPoint("BOTTOMRIGHT", t, "BOTTOMRIGHT", 2, -2)
+    fs:Hide()
+    row.icons[i], row.labels[i] = t, fs
+    return t, fs
 end
 
 -- db.side is one of "RIGHT", "LEFT" or "CENTER" (the key predates the centre
@@ -74,20 +84,46 @@ local function updatePlate(unit, plate)
     local shown = 0
 
     for _, entry in ipairs(db.tracked) do
-        -- Only a definite "missing" draws an icon. nil means the client refused to
-        -- answer, and guessing there would flag people who are actually buffed.
-        if entry.enabled and ns.HasBuff(unit, entry) == false then
-            shown = shown + 1
-            local t = getIcon(row, shown)
-            t:SetTexture(entry.icon or ns.FALLBACK_ICON)
-            t:SetSize(size, size)
-            t:SetAlpha(db.alpha)
-            t:ClearAllPoints()
-            t:SetPoint("LEFT", row, "LEFT", (shown - 1) * (size + spacing), 0)
-            t:Show()
+        if entry.enabled then
+            -- Only a definite "missing" draws an icon. nil means the client refused
+            -- to answer, and guessing there would flag people who are actually
+            -- buffed. An aura with no readable duration is likewise left alone.
+            local found, aura = ns.HasBuff(unit, entry)
+            local expiring, minsLeft
+            if found == true and db.flagExpiring then
+                local left = ns.AuraRemaining(aura)
+                if left and left > 0 and left <= db.expiringMinutes * 60 then
+                    expiring = true
+                    minsLeft = math.max(1, math.ceil(left / 60))
+                end
+            end
+
+            if found == false or expiring then
+                shown = shown + 1
+                local t, fs = getIcon(row, shown)
+                t:SetTexture(entry.icon or ns.FALLBACK_ICON)
+                t:SetSize(size, size)
+                t:SetAlpha(db.alpha)
+                t:ClearAllPoints()
+                t:SetPoint("LEFT", row, "LEFT", (shown - 1) * (size + spacing), 0)
+                if expiring then
+                    t:SetVertexColor(EXPIRING_TINT[1], EXPIRING_TINT[2], EXPIRING_TINT[3])
+                    fs:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",
+                        math.max(7, math.floor(size * 0.46)), "OUTLINE")
+                    fs:SetText(minsLeft .. "m")
+                    fs:Show()
+                else
+                    t:SetVertexColor(1, 1, 1)
+                    fs:Hide()
+                end
+                t:Show()
+            end
         end
     end
-    for i = shown + 1, #row.icons do row.icons[i]:Hide() end
+    for i = shown + 1, #row.icons do
+        row.icons[i]:Hide()
+        row.labels[i]:Hide()
+    end
 
     if shown == 0 then
         row:Hide()

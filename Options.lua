@@ -134,11 +134,13 @@ local function buildPanel()
 
     Header("Buffs to flag", 16, -104)
 
-    -- Presets, two columns.
+    -- Presets, three columns: nine of them in five rows wasted enough height to
+    -- push the controls below off the bottom of the panel.
+    local PRESET_COLS = 3
     for i, preset in ipairs(ns.PRESETS) do
-        local col = (i - 1) % 2
-        local row = math.floor((i - 1) / 2)
-        Check(preset.label, 18 + col * 250, -128 - row * 26,
+        local col = (i - 1) % PRESET_COLS
+        local row = math.floor((i - 1) / PRESET_COLS)
+        Check(preset.label, 18 + col * 174, -128 - row * 26,
             function()
                 local e = ns.FindTracked(preset.key)
                 return e and e.enabled
@@ -158,7 +160,7 @@ local function buildPanel()
                 .. table.concat(preset.names, ", ") .. ").")
     end
 
-    local presetRows = math.ceil(#ns.PRESETS / 2)
+    local presetRows = math.ceil(#ns.PRESETS / PRESET_COLS)
     local customY = -128 - presetRows * 26 - 18
 
     Header("Add another buff", 16, customY)
@@ -277,21 +279,33 @@ local function buildPanel()
         function() return ns.db.yOffset end, function(v) ns.db.yOffset = v end,
         nil, appearance)
 
-    SideDropdown(18, -134, appearance)
+    -- Expiring buffs: same icon, tinted amber with the minutes left on it, so a
+    -- buff about to run out reads differently from one that was never cast.
+    Slider("Warn under (minutes)", 18, -144, 1, 30, 1,
+        function() return ns.db.expiringMinutes end,
+        function(v) ns.db.expiringMinutes = v end, nil, appearance)
+
+    Check("Also flag buffs about to expire", 268, -146,
+        function() return ns.db.flagExpiring end, function(v) ns.db.flagExpiring = v end,
+        "Shows the icon tinted amber, with the minutes left on it, once a buff drops "
+            .. "below the threshold. A buff whose remaining time this client won't "
+            .. "report is never flagged.", appearance)
+
+    SideDropdown(18, -196, appearance)
 
     local posHint = appearance:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-    posHint:SetPoint("TOPLEFT", 18, -180)
+    posHint:SetPoint("TOPLEFT", 18, -242)
     posHint:SetWidth(240)
     posHint:SetJustifyH("LEFT")
     posHint:SetText("Centered puts the row over the name at offset 0, 0.")
 
-    Check("Skip my own nameplate", 268, -136,
+    Check("Skip my own nameplate", 268, -198,
         function() return ns.db.hideSelf end, function(v) ns.db.hideSelf = v end,
         "Leaves the personal resource display alone.", appearance)
 
     local diagBtn = CreateFrame("Button", nil, appearance, "UIPanelButtonTemplate")
     diagBtn:SetSize(190, 22)
-    diagBtn:SetPoint("TOPLEFT", 268, -166)
+    diagBtn:SetPoint("TOPLEFT", 268, -228)
     diagBtn:SetText("Run diagnostics")
     diagBtn:SetScript("OnClick", function() ns.RunDiagnostics() end)
     diagBtn:SetScript("OnEnter", function(self)

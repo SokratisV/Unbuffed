@@ -55,21 +55,22 @@ local function scanByName(unit, names)
             local n = aura.name
             if n and not IsSecret(n) then
                 for j = 1, #names do
-                    if n == names[j] then return true end
+                    if n == names[j] then return true, aura end
                 end
             end
         end
         return false
     end
 
-    -- Pre-Midnight clients.
+    -- Pre-Midnight clients. UnitBuff's sixth return is the expiration time; wrap it
+    -- so callers see the same shape as the modern aura record.
     if _G.UnitBuff then
         for i = 1, MAX_AURA_SLOTS do
-            local ok, n = pcall(_G.UnitBuff, unit, i)
+            local ok, n, _, _, _, _, expires = pcall(_G.UnitBuff, unit, i)
             if not ok then return nil end
             if not n then return false end
             for j = 1, #names do
-                if n == names[j] then return true end
+                if n == names[j] then return true, { expirationTime = expires } end
             end
         end
         return false
@@ -78,7 +79,20 @@ local function scanByName(unit, names)
     return nil
 end
 
--- true = has it, false = definitely missing, nil = couldn't tell.
+-- Seconds left on an aura, or nil when that can't be known: no duration at all
+-- (expirationTime 0, which is how a permanent buff reports), or a client that
+-- won't hand over the number. nil must not be read as "about to expire".
+function ns.AuraRemaining(aura)
+    if type(aura) ~= "table" then return nil end
+    local exp = aura.expirationTime
+    if IsSecret(exp) or type(exp) ~= "number" or exp <= 0 then return nil end
+    return exp - GetTime()
+end
+
+-- Returns found, aura:
+--   true  = has it (aura is the record, when the client handed one over)
+--   false = definitely missing
+--   nil   = couldn't tell
 function ns.HasBuff(unit, entry)
     local ids, names = entry.ids, entry.names
 
@@ -92,7 +106,7 @@ function ns.HasBuff(unit, entry)
         for i = 1, #ids do
             if ns.SpellReadable(ids[i]) then
                 local ok, aura = pcall(GetUnitAuraBySpellID, unit, ids[i])
-                if ok and aura ~= nil and not IsSecret(aura) then return true end
+                if ok and aura ~= nil and not IsSecret(aura) then return true, aura end
             end
         end
     end
@@ -115,7 +129,7 @@ function ns.HasBuff(unit, entry)
             local ok, aura = pcall(GetAuraDataBySpellName, unit, names[i], "HELPFUL")
             if ok then
                 answered = true
-                if aura ~= nil and not IsSecret(aura) then return true end
+                if aura ~= nil and not IsSecret(aura) then return true, aura end
             end
         end
         if answered then return false end
@@ -147,6 +161,13 @@ function ns.RunDiagnostics()
         print("  |cffffd100No target.|r Target a friendly player and run this again to test live reads.")
         return
     end
+    -- Whether ns.db is the real SavedVariables table or still the load-time
+    -- stand-in. If this ever says false, ADDON_LOADED didn't reach us and every
+    -- setting is being read from, and written to, a table nobody saves.
+    print("  SavedVariables linked: " .. tostring(ns.db == UnbuffedDB)
+        .. "  |  side=" .. tostring(ns.db.side) .. " iconSize=" .. tostring(ns.db.iconSize)
+        .. " warnUnder=" .. tostring(ns.db.expiringMinutes) .. "m")
+
     local isPlayer = ns.Truth(UnitIsPlayer(unit))
     local isFriend = ns.Truth(UnitIsFriend("player", unit))
     print("  target: isPlayer=" .. tostring(isPlayer) .. " isFriend=" .. tostring(isFriend)
@@ -157,8 +178,10 @@ function ns.RunDiagnostics()
         return
     end
     for _, e in ipairs(ns.db.tracked) do
-        local has = ns.HasBuff(unit, e)
-        local verdict = (has == true and "|cff55ff55has it|r")
+        local has, aura = ns.HasBuff(unit, e)
+        local left = ns.AuraRemaining(aura)
+        local verdict = (has == true and ("|cff55ff55has it|r"
+                .. (left and (" (" .. math.floor(left / 60) .. "m left)") or " (no readable duration)")))
             or (has == false and "|cffff5555MISSING|r")
             or "|cff888888no answer -- not flagged|r"
         local idNote = ""

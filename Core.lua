@@ -106,6 +106,8 @@ ns.defaults = {
     yOffset   = 0,
     alpha     = 1,
     hideSelf  = true,   -- your own nameplate (the personal resource display)
+    flagExpiring    = true,  -- also flag buffs that are about to run out
+    expiringMinutes = 5,     -- ...with this much left or less
     refresh   = 0.5,    -- seconds between re-checks of every visible plate
     greeted   = false,
 }

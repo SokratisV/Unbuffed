@@ -3,7 +3,7 @@
 **Flags friendly player nameplates that are missing the buffs you track.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-![Version](https://img.shields.io/badge/version-1.0.1-brightgreen)
+![Version](https://img.shields.io/badge/version-1.1.0-brightgreen)
 ![WoW](https://img.shields.io/badge/WoW-Forever%20%2F%20TBC%20Classic-f8b700)
 ![Interface](https://img.shields.io/badge/interface-16001%20%7C%2020505-555)
 
@@ -25,7 +25,15 @@ Presets cover the long-term raid buffs: Fortitude, Arcane Intellect, Mark of the
 Divine Spirit, Thorns, Battle Shout, and Blessings of Might / Wisdom / Kings.
 
 Appearance is configurable: icon size, opacity, horizontal and vertical offset, and
-whether the row sits to the right or the left of the nameplate.
+whether the row sits right, left, or centered over the name.
+
+## Buffs about to expire
+
+With **Also flag buffs about to expire** on, a buff that has less than the warning
+threshold left (5 minutes by default) is shown too -- the same icon, tinted amber with
+the minutes remaining on it, so it reads differently from a buff that was never cast at
+all. A buff whose remaining time this client will not report is never flagged, for the
+same reason an unreadable buff is never drawn as missing.
 
 ## Why buffs are matched by name
 

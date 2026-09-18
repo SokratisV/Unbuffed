@@ -2,7 +2,7 @@
 ## Title: Unbuffed
 ## Notes: Flags friendly player nameplates that are missing the buffs you track, with a small icon row beside the plate (/unbuffed).
 ## Author: Sokratis
-## Version: 1.0.1
+## Version: 1.1.0
 ## SavedVariables: UnbuffedDB
 ## IconTexture: Interface\Icons\Spell_Holy_WordFortitude
 ## X-License: MIT
