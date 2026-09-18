@@ -5,22 +5,27 @@ panel.name = "Unbuffed"
 local category          -- modern Settings category, when the client has one
 local refreshers = {}   -- run on every panel show, to resync widgets with the db
 local rebuildCustomList -- forward decl
+local appearance        -- container for everything below the custom-buff list
 
 --------------------------------------------------------------------------
 -- Widget helpers
 --------------------------------------------------------------------------
-local function Header(text, x, y)
-    local fs = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+-- Every helper takes an optional parent so the lower half of the panel can live in
+-- a container frame that slides with the length of the custom-buff list.
+local function Header(text, x, y, parent)
+    local p = parent or panel
+    local fs = p:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     fs:SetPoint("TOPLEFT", x, y)
     fs:SetText(text)
     return fs
 end
 
-local function Check(label, x, y, get, set, tooltip)
-    local cb = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+local function Check(label, x, y, get, set, tooltip, parent)
+    local p = parent or panel
+    local cb = CreateFrame("CheckButton", nil, p, "UICheckButtonTemplate")
     cb:SetPoint("TOPLEFT", x, y)
     cb:SetSize(24, 24)
-    local fs = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    local fs = p:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     fs:SetPoint("LEFT", cb, "RIGHT", 2, 0)
     fs:SetText(label)
     cb:SetScript("OnClick", function(self) set(self:GetChecked() and true or false); ns.RefreshAll() end)
@@ -37,9 +42,9 @@ local function Check(label, x, y, get, set, tooltip)
 end
 
 local sliderCount = 0
-local function Slider(label, x, y, lo, hi, step, get, set, fmt)
+local function Slider(label, x, y, lo, hi, step, get, set, fmt, parent)
     sliderCount = sliderCount + 1
-    local s = CreateFrame("Slider", "UnbuffedSlider" .. sliderCount, panel, "OptionsSliderTemplate")
+    local s = CreateFrame("Slider", "UnbuffedSlider" .. sliderCount, parent or panel, "OptionsSliderTemplate")
     s:SetWidth(190)
     s:SetPoint("TOPLEFT", x, y)
     s:SetMinMaxValues(lo, hi)
@@ -61,13 +66,14 @@ local SIDES = { { "Right of the nameplate", "RIGHT" }, { "Left of the nameplate"
 
 -- Midnight removed UIDropDownMenu; there the widget is a DropdownButton driven by
 -- MenuUtil. Keep the legacy branch for the older Classic clients.
-local function SideDropdown(x, y)
-    local fs = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+local function SideDropdown(x, y, parent)
+    local p = parent or panel
+    local fs = p:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     fs:SetPoint("TOPLEFT", x, y)
     fs:SetText("Icon row position")
 
     if MenuUtil and MenuUtil.CreateRadioMenu then
-        local dd = CreateFrame("DropdownButton", nil, panel, "WowStyle1DropdownTemplate")
+        local dd = CreateFrame("DropdownButton", nil, p, "WowStyle1DropdownTemplate")
         dd:SetPoint("TOPLEFT", x, y - 18)
         dd:SetWidth(190)
         MenuUtil.CreateRadioMenu(dd,
@@ -78,7 +84,7 @@ local function SideDropdown(x, y)
         return dd
     end
 
-    local dd = CreateFrame("Frame", "UnbuffedSideDrop", panel, "UIDropDownMenuTemplate")
+    local dd = CreateFrame("Frame", "UnbuffedSideDrop", p, "UIDropDownMenuTemplate")
     dd:SetPoint("TOPLEFT", x - 16, y - 18)
     UIDropDownMenu_SetWidth(dd, 170)
     local function setText()
@@ -221,31 +227,51 @@ rebuildCustomList = function()
         end
     end
     emptyFS:SetShown(shown == 0)
+    -- Pull the rest of the panel up to sit just under the list, whatever length it
+    -- is. Guard for the first call, which runs before the container exists.
+    if appearance then
+        appearance:ClearAllPoints()
+        appearance:SetPoint("TOPLEFT", panel, "TOPLEFT", 0,
+            customListY - math.max(shown, 1) * 20 - 16)
+    end
 end
 refreshers[#refreshers + 1] = function() rebuildCustomList() end
 
-local appearanceY = customListY - 4 * 20 - 24
-Header("Appearance", 16, appearanceY)
+-- Everything below the custom list lives in this container, so the whole block can
+-- slide with the length of that list instead of the panel reserving room for rows
+-- that usually aren't there (and shoving the bottom controls under the Close
+-- button when they are). rebuildCustomList positions it.
+appearance = CreateFrame("Frame", nil, panel)
+appearance:SetSize(1, 1)
+-- Start where an empty list puts it; rebuildCustomList corrects it on every show.
+appearance:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, customListY - 20 - 16)
 
-Slider("Icon size", 18, appearanceY - 44, 8, 40, 1,
-    function() return ns.db.iconSize end, function(v) ns.db.iconSize = v end)
-Slider("Opacity", 268, appearanceY - 44, 0.2, 1, 0.05,
+Header("Appearance", 16, 0, appearance)
+
+Slider("Icon size", 18, -44, 8, 40, 1,
+    function() return ns.db.iconSize end, function(v) ns.db.iconSize = v end,
+    nil, appearance)
+Slider("Opacity", 268, -44, 0.2, 1, 0.05,
     function() return ns.db.alpha end, function(v) ns.db.alpha = v end,
-    function(v) return ("%d%%"):format(math.floor(v * 100 + 0.5)) end)
-Slider("Horizontal offset", 18, appearanceY - 94, 0, 60, 1,
-    function() return ns.db.xOffset end, function(v) ns.db.xOffset = v end)
-Slider("Vertical offset", 268, appearanceY - 94, -40, 40, 1,
-    function() return ns.db.yOffset end, function(v) ns.db.yOffset = v end)
+    function(v) return ("%d%%"):format(math.floor(v * 100 + 0.5)) end, appearance)
+-- Negative pulls the row back over the nameplate rather than away from it; the
+-- anchor flips sign with the side, so it reads the same whichever side you pick.
+Slider("Horizontal offset", 18, -94, -60, 60, 1,
+    function() return ns.db.xOffset end, function(v) ns.db.xOffset = v end,
+    nil, appearance)
+Slider("Vertical offset", 268, -94, -40, 40, 1,
+    function() return ns.db.yOffset end, function(v) ns.db.yOffset = v end,
+    nil, appearance)
 
-SideDropdown(18, appearanceY - 134)
+SideDropdown(18, -134, appearance)
 
-Check("Skip my own nameplate", 268, appearanceY - 136,
+Check("Skip my own nameplate", 268, -136,
     function() return ns.db.hideSelf end, function(v) ns.db.hideSelf = v end,
-    "Leaves the personal resource display alone.")
+    "Leaves the personal resource display alone.", appearance)
 
-local diagBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+local diagBtn = CreateFrame("Button", nil, appearance, "UIPanelButtonTemplate")
 diagBtn:SetSize(190, 22)
-diagBtn:SetPoint("TOPLEFT", 268, appearanceY - 164)
+diagBtn:SetPoint("TOPLEFT", 268, -166)
 diagBtn:SetText("Run diagnostics")
 diagBtn:SetScript("OnClick", function() ns.RunDiagnostics() end)
 diagBtn:SetScript("OnEnter", function(self)
