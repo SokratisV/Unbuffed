@@ -111,195 +111,212 @@ end
 --------------------------------------------------------------------------
 -- Layout
 --------------------------------------------------------------------------
-local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-title:SetPoint("TOPLEFT", 16, -16)
-title:SetText("Unbuffed")
+-- The panel is built on first show, not at load. A Settings canvas category
+-- needs a frame up front, but not a populated one -- and building widgets at
+-- load means creating them against SavedVariables that have not arrived yet.
+-- Anything that reads or writes the db while being constructed then works off
+-- the stand-in defaults, and can write a default back over a loaded value.
+local built = false
+local function buildPanel()
+    if built then return end
+    built = true
+    local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", 16, -16)
+    title:SetText("Unbuffed")
 
-local blurb = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-blurb:SetPoint("TOPLEFT", 16, -38)
-blurb:SetWidth(520)
-blurb:SetJustifyH("LEFT")
-blurb:SetText("Shows a small icon beside a friendly player's nameplate for each tracked buff they are |cffffd100missing|r. A fully buffed player shows nothing.")
+    local blurb = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    blurb:SetPoint("TOPLEFT", 16, -38)
+    blurb:SetWidth(520)
+    blurb:SetJustifyH("LEFT")
+    blurb:SetText("Shows a small icon beside a friendly player's nameplate for each tracked buff they are |cffffd100missing|r. A fully buffed player shows nothing.")
 
-Check("Enabled", 18, -70, function() return ns.db.enabled end, function(v) ns.db.enabled = v end)
+    Check("Enabled", 18, -70, function() return ns.db.enabled end, function(v) ns.db.enabled = v end)
 
-Header("Buffs to flag", 16, -104)
+    Header("Buffs to flag", 16, -104)
 
--- Presets, two columns.
-for i, preset in ipairs(ns.PRESETS) do
-    local col = (i - 1) % 2
-    local row = math.floor((i - 1) / 2)
-    Check(preset.label, 18 + col * 250, -128 - row * 26,
-        function()
-            local e = ns.FindTracked(preset.key)
-            return e and e.enabled
-        end,
-        function(on)
-            if on then
-                ns.AddTracked({
-                    key = preset.key, label = preset.label, icon = preset.icon,
-                    names = { unpack(preset.names) },
-                })
-            else
-                ns.RemoveTracked(preset.key)
+    -- Presets, two columns.
+    for i, preset in ipairs(ns.PRESETS) do
+        local col = (i - 1) % 2
+        local row = math.floor((i - 1) / 2)
+        Check(preset.label, 18 + col * 250, -128 - row * 26,
+            function()
+                local e = ns.FindTracked(preset.key)
+                return e and e.enabled
+            end,
+            function(on)
+                if on then
+                    ns.AddTracked({
+                        key = preset.key, label = preset.label, icon = preset.icon,
+                        names = { unpack(preset.names) },
+                    })
+                else
+                    ns.RemoveTracked(preset.key)
+                end
+                if rebuildCustomList then rebuildCustomList() end
+            end,
+            "Matched by name, so every rank counts -- and so do the group versions ("
+                .. table.concat(preset.names, ", ") .. ").")
+    end
+
+    local presetRows = math.ceil(#ns.PRESETS / 2)
+    local customY = -128 - presetRows * 26 - 18
+
+    Header("Add another buff", 16, customY)
+
+    local addBox = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
+    addBox:SetSize(200, 22)
+    addBox:SetPoint("TOPLEFT", 22, customY - 26)
+    addBox:SetAutoFocus(false)
+
+    local addHint = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    addHint:SetPoint("TOPLEFT", 22, customY - 52)
+    addHint:SetText("Buff name or spell ID. A name matches every rank; an ID also survives combat.")
+
+    local addBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    addBtn:SetSize(70, 22)
+    addBtn:SetPoint("LEFT", addBox, "RIGHT", 6, 0)
+    addBtn:SetText("Add")
+
+    local function doAdd()
+        local text = (addBox:GetText() or ""):gsub("^%s+", ""):gsub("%s+$", "")
+        if text == "" then return end
+        local entry, err = ns.EntryFromInput(text)
+        if not entry then ns.Print(err); return end
+        ns.AddTracked(entry)
+        addBox:SetText("")
+        addBox:ClearFocus()
+        if rebuildCustomList then rebuildCustomList() end
+        ns.RefreshAll()
+        ns.Print("now flagging |cffffd100" .. entry.label .. "|r.")
+    end
+    addBtn:SetScript("OnClick", doAdd)
+    addBox:SetScript("OnEnterPressed", doAdd)
+    addBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+
+    -- Custom (non-preset) entries, each with a remove button.
+    local customRows = {}
+    local customListY = customY - 76
+
+    local emptyFS = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    emptyFS:SetPoint("TOPLEFT", 22, customListY)
+    emptyFS:SetText("No custom buffs added.")
+
+    local PRESET_KEYS = {}
+    for _, p in ipairs(ns.PRESETS) do PRESET_KEYS[p.key] = true end
+
+    rebuildCustomList = function()
+        for _, r in ipairs(customRows) do r:Hide() end
+        local shown = 0
+        for _, e in ipairs(ns.db.tracked) do
+            if not PRESET_KEYS[e.key] then
+                shown = shown + 1
+                local r = customRows[shown]
+                if not r then
+                    r = CreateFrame("Frame", nil, panel)
+                    r:SetSize(400, 20)
+                    r.icon = r:CreateTexture(nil, "ARTWORK")
+                    r.icon:SetSize(16, 16)
+                    r.icon:SetPoint("LEFT", 0, 0)
+                    r.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+                    r.label = r:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+                    r.label:SetPoint("LEFT", r.icon, "RIGHT", 6, 0)
+                    r.del = CreateFrame("Button", nil, r)
+                    r.del:SetSize(16, 16)
+                    r.del:SetPoint("LEFT", 300, 0)
+                    r.del:SetNormalTexture("Interface\\Buttons\\UI-StopButton")
+                    r.del:GetNormalTexture():SetVertexColor(0.9, 0.4, 0.4)
+                    r.del:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+                    customRows[shown] = r
+                end
+                r:SetPoint("TOPLEFT", 22, customListY - (shown - 1) * 20)
+                r.icon:SetTexture(e.icon or ns.FALLBACK_ICON)
+                r.label:SetText(e.label)
+                r.del:SetScript("OnClick", function()
+                    ns.RemoveTracked(e.key)
+                    rebuildCustomList()
+                    ns.RefreshAll()
+                end)
+                r:Show()
             end
-            if rebuildCustomList then rebuildCustomList() end
-        end,
-        "Matched by name, so every rank counts -- and so do the group versions ("
-            .. table.concat(preset.names, ", ") .. ").")
-end
-
-local presetRows = math.ceil(#ns.PRESETS / 2)
-local customY = -128 - presetRows * 26 - 18
-
-Header("Add another buff", 16, customY)
-
-local addBox = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
-addBox:SetSize(200, 22)
-addBox:SetPoint("TOPLEFT", 22, customY - 26)
-addBox:SetAutoFocus(false)
-
-local addHint = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-addHint:SetPoint("TOPLEFT", 22, customY - 52)
-addHint:SetText("Buff name or spell ID. A name matches every rank; an ID also survives combat.")
-
-local addBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-addBtn:SetSize(70, 22)
-addBtn:SetPoint("LEFT", addBox, "RIGHT", 6, 0)
-addBtn:SetText("Add")
-
-local function doAdd()
-    local text = (addBox:GetText() or ""):gsub("^%s+", ""):gsub("%s+$", "")
-    if text == "" then return end
-    local entry, err = ns.EntryFromInput(text)
-    if not entry then ns.Print(err); return end
-    ns.AddTracked(entry)
-    addBox:SetText("")
-    addBox:ClearFocus()
-    if rebuildCustomList then rebuildCustomList() end
-    ns.RefreshAll()
-    ns.Print("now flagging |cffffd100" .. entry.label .. "|r.")
-end
-addBtn:SetScript("OnClick", doAdd)
-addBox:SetScript("OnEnterPressed", doAdd)
-addBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-
--- Custom (non-preset) entries, each with a remove button.
-local customRows = {}
-local customListY = customY - 76
-
-local emptyFS = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-emptyFS:SetPoint("TOPLEFT", 22, customListY)
-emptyFS:SetText("No custom buffs added.")
-
-local PRESET_KEYS = {}
-for _, p in ipairs(ns.PRESETS) do PRESET_KEYS[p.key] = true end
-
-rebuildCustomList = function()
-    for _, r in ipairs(customRows) do r:Hide() end
-    local shown = 0
-    for _, e in ipairs(ns.db.tracked) do
-        if not PRESET_KEYS[e.key] then
-            shown = shown + 1
-            local r = customRows[shown]
-            if not r then
-                r = CreateFrame("Frame", nil, panel)
-                r:SetSize(400, 20)
-                r.icon = r:CreateTexture(nil, "ARTWORK")
-                r.icon:SetSize(16, 16)
-                r.icon:SetPoint("LEFT", 0, 0)
-                r.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-                r.label = r:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-                r.label:SetPoint("LEFT", r.icon, "RIGHT", 6, 0)
-                r.del = CreateFrame("Button", nil, r)
-                r.del:SetSize(16, 16)
-                r.del:SetPoint("LEFT", 300, 0)
-                r.del:SetNormalTexture("Interface\\Buttons\\UI-StopButton")
-                r.del:GetNormalTexture():SetVertexColor(0.9, 0.4, 0.4)
-                r.del:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
-                customRows[shown] = r
-            end
-            r:SetPoint("TOPLEFT", 22, customListY - (shown - 1) * 20)
-            r.icon:SetTexture(e.icon or ns.FALLBACK_ICON)
-            r.label:SetText(e.label)
-            r.del:SetScript("OnClick", function()
-                ns.RemoveTracked(e.key)
-                rebuildCustomList()
-                ns.RefreshAll()
-            end)
-            r:Show()
+        end
+        emptyFS:SetShown(shown == 0)
+        -- Pull the rest of the panel up to sit just under the list, whatever length it
+        -- is. Guard for the first call, which runs before the container exists.
+        if appearance then
+            appearance:ClearAllPoints()
+            appearance:SetPoint("TOPLEFT", panel, "TOPLEFT", 0,
+                customListY - math.max(shown, 1) * 20 - 16)
         end
     end
-    emptyFS:SetShown(shown == 0)
-    -- Pull the rest of the panel up to sit just under the list, whatever length it
-    -- is. Guard for the first call, which runs before the container exists.
-    if appearance then
-        appearance:ClearAllPoints()
-        appearance:SetPoint("TOPLEFT", panel, "TOPLEFT", 0,
-            customListY - math.max(shown, 1) * 20 - 16)
-    end
+    refreshers[#refreshers + 1] = function() rebuildCustomList() end
+
+    -- Everything below the custom list lives in this container, so the whole block can
+    -- slide with the length of that list instead of the panel reserving room for rows
+    -- that usually aren't there (and shoving the bottom controls under the Close
+    -- button when they are). rebuildCustomList positions it.
+    appearance = CreateFrame("Frame", nil, panel)
+    appearance:SetSize(1, 1)
+    -- Start where an empty list puts it; rebuildCustomList corrects it on every show.
+    appearance:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, customListY - 20 - 16)
+
+    Header("Appearance", 16, 0, appearance)
+
+    Slider("Icon size", 18, -44, 8, 40, 1,
+        function() return ns.db.iconSize end, function(v) ns.db.iconSize = v end,
+        nil, appearance)
+    Slider("Opacity", 268, -44, 0.2, 1, 0.05,
+        function() return ns.db.alpha end, function(v) ns.db.alpha = v end,
+        function(v) return ("%d%%"):format(math.floor(v * 100 + 0.5)) end, appearance)
+    -- Beside the plate this is a gap, and negative pulls the row back over the plate;
+    -- the anchor flips sign with the side so it reads the same either way. Centered
+    -- there is no gap, so it's a plain nudge and 0 sits the row over the name.
+    Slider("Horizontal offset", 18, -94, -60, 60, 1,
+        function() return ns.db.xOffset end, function(v) ns.db.xOffset = v end,
+        nil, appearance)
+    Slider("Vertical offset", 268, -94, -40, 40, 1,
+        function() return ns.db.yOffset end, function(v) ns.db.yOffset = v end,
+        nil, appearance)
+
+    SideDropdown(18, -134, appearance)
+
+    local posHint = appearance:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    posHint:SetPoint("TOPLEFT", 18, -180)
+    posHint:SetWidth(240)
+    posHint:SetJustifyH("LEFT")
+    posHint:SetText("Centered puts the row over the name at offset 0, 0.")
+
+    Check("Skip my own nameplate", 268, -136,
+        function() return ns.db.hideSelf end, function(v) ns.db.hideSelf = v end,
+        "Leaves the personal resource display alone.", appearance)
+
+    local diagBtn = CreateFrame("Button", nil, appearance, "UIPanelButtonTemplate")
+    diagBtn:SetSize(190, 22)
+    diagBtn:SetPoint("TOPLEFT", 268, -166)
+    diagBtn:SetText("Run diagnostics")
+    diagBtn:SetScript("OnClick", function() ns.RunDiagnostics() end)
+    diagBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Prints to chat what this client will and won't let addons read, per tracked buff, against your current target.", nil, nil, nil, nil, true)
+        GameTooltip:Show()
+    end)
+    diagBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 end
-refreshers[#refreshers + 1] = function() rebuildCustomList() end
 
--- Everything below the custom list lives in this container, so the whole block can
--- slide with the length of that list instead of the panel reserving room for rows
--- that usually aren't there (and shoving the bottom controls under the Close
--- button when they are). rebuildCustomList positions it.
-appearance = CreateFrame("Frame", nil, panel)
-appearance:SetSize(1, 1)
--- Start where an empty list puts it; rebuildCustomList corrects it on every show.
-appearance:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, customListY - 20 - 16)
-
-Header("Appearance", 16, 0, appearance)
-
-Slider("Icon size", 18, -44, 8, 40, 1,
-    function() return ns.db.iconSize end, function(v) ns.db.iconSize = v end,
-    nil, appearance)
-Slider("Opacity", 268, -44, 0.2, 1, 0.05,
-    function() return ns.db.alpha end, function(v) ns.db.alpha = v end,
-    function(v) return ("%d%%"):format(math.floor(v * 100 + 0.5)) end, appearance)
--- Beside the plate this is a gap, and negative pulls the row back over the plate;
--- the anchor flips sign with the side so it reads the same either way. Centered
--- there is no gap, so it's a plain nudge and 0 sits the row over the name.
-Slider("Horizontal offset", 18, -94, -60, 60, 1,
-    function() return ns.db.xOffset end, function(v) ns.db.xOffset = v end,
-    nil, appearance)
-Slider("Vertical offset", 268, -94, -40, 40, 1,
-    function() return ns.db.yOffset end, function(v) ns.db.yOffset = v end,
-    nil, appearance)
-
-SideDropdown(18, -134, appearance)
-
-local posHint = appearance:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-posHint:SetPoint("TOPLEFT", 18, -180)
-posHint:SetWidth(240)
-posHint:SetJustifyH("LEFT")
-posHint:SetText("Centered puts the row over the name at offset 0, 0.")
-
-Check("Skip my own nameplate", 268, -136,
-    function() return ns.db.hideSelf end, function(v) ns.db.hideSelf = v end,
-    "Leaves the personal resource display alone.", appearance)
-
-local diagBtn = CreateFrame("Button", nil, appearance, "UIPanelButtonTemplate")
-diagBtn:SetSize(190, 22)
-diagBtn:SetPoint("TOPLEFT", 268, -166)
-diagBtn:SetText("Run diagnostics")
-diagBtn:SetScript("OnClick", function() ns.RunDiagnostics() end)
-diagBtn:SetScript("OnEnter", function(self)
-    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:SetText("Prints to chat what this client will and won't let addons read, per tracked buff, against your current target.", nil, nil, nil, nil, true)
-    GameTooltip:Show()
-end)
-diagBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 --------------------------------------------------------------------------
 -- Register + open
 --------------------------------------------------------------------------
-panel.refresh = function()
+local function refreshPanel()
     if not ns.db then return end
+    buildPanel()
     for _, fn in ipairs(refreshers) do fn() end
 end
-panel:SetScript("OnShow", panel.refresh)
+panel:SetScript("OnShow", refreshPanel)
+-- The modern Settings frame drives canvas panels through these rather than the
+-- legacy `refresh`, and Baganator/Auctionator define all three even when empty.
+panel.OnRefresh = refreshPanel
+panel.OnCommit  = function() end
+panel.OnDefault = function() end
 
 if Settings and Settings.RegisterCanvasLayoutCategory then
     category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)

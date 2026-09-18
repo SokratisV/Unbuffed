@@ -122,13 +122,11 @@ local function copyDefaults(src, dst)
     return dst
 end
 
--- Stand-in database, live from the moment this file loads and swapped for the real
--- SavedVariables at ADDON_LOADED. A Settings canvas panel has to be *built* during
--- load so it can be registered, and some widgets evaluate their callbacks right
--- there and then -- MenuUtil generates a dropdown's menu the moment it's set up,
--- which means reading ns.db before SavedVariables exist. Seeding it with defaults
--- keeps those reads on a real table; the panel resyncs against the loaded values
--- when it is next shown.
+-- Stand-in database so nothing can index a nil ns.db between load and
+-- ADDON_LOADED, which is when the real SavedVariables arrive and replace it.
+-- The options panel no longer relies on this -- it builds itself on first show,
+-- by which time the loaded values are in place -- but anything that runs early
+-- still gets a real table rather than a crash.
 ns.db = copyDefaults(ns.defaults, {})
 
 --------------------------------------------------------------------------
