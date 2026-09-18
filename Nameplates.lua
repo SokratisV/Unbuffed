@@ -31,10 +31,21 @@ local function getIcon(row, i)
     return t
 end
 
+-- db.side is one of "RIGHT", "LEFT" or "CENTER" (the key predates the centre
+-- option; renaming it would orphan everyone's saved setting).
+--
+-- The offsets mean slightly different things per position, and deliberately so.
+-- Beside the plate, xOffset is a GAP: it reads as "distance away from the plate"
+-- on both sides, so the sign is flipped for LEFT and a negative value pulls the
+-- row back over the plate either way. Centred, there is no gap to describe, so
+-- xOffset is a plain nudge -- positive right, negative left -- and 0, 0 sits the
+-- row dead centre on the nameplate, over the name.
 local function anchorRow(row, plate)
     local db = ns.db
     row:ClearAllPoints()
-    if db.side == "LEFT" then
+    if db.side == "CENTER" then
+        row:SetPoint("CENTER", plate, "CENTER", db.xOffset, db.yOffset)
+    elseif db.side == "LEFT" then
         row:SetPoint("RIGHT", plate, "LEFT", -db.xOffset, db.yOffset)
     else
         row:SetPoint("LEFT", plate, "RIGHT", db.xOffset, db.yOffset)

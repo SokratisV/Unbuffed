@@ -62,7 +62,11 @@ local function Slider(label, x, y, lo, hi, step, get, set, fmt, parent)
     return s
 end
 
-local SIDES = { { "Right of the nameplate", "RIGHT" }, { "Left of the nameplate", "LEFT" } }
+local SIDES = {
+    { "Right of the nameplate",   "RIGHT" },
+    { "Left of the nameplate",    "LEFT" },
+    { "Centered over the name",   "CENTER" },
+}
 
 -- Midnight removed UIDropDownMenu; there the widget is a DropdownButton driven by
 -- MenuUtil. Keep the legacy branch for the older Classic clients.
@@ -254,8 +258,9 @@ Slider("Icon size", 18, -44, 8, 40, 1,
 Slider("Opacity", 268, -44, 0.2, 1, 0.05,
     function() return ns.db.alpha end, function(v) ns.db.alpha = v end,
     function(v) return ("%d%%"):format(math.floor(v * 100 + 0.5)) end, appearance)
--- Negative pulls the row back over the nameplate rather than away from it; the
--- anchor flips sign with the side, so it reads the same whichever side you pick.
+-- Beside the plate this is a gap, and negative pulls the row back over the plate;
+-- the anchor flips sign with the side so it reads the same either way. Centered
+-- there is no gap, so it's a plain nudge and 0 sits the row over the name.
 Slider("Horizontal offset", 18, -94, -60, 60, 1,
     function() return ns.db.xOffset end, function(v) ns.db.xOffset = v end,
     nil, appearance)
@@ -264,6 +269,12 @@ Slider("Vertical offset", 268, -94, -40, 40, 1,
     nil, appearance)
 
 SideDropdown(18, -134, appearance)
+
+local posHint = appearance:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+posHint:SetPoint("TOPLEFT", 18, -180)
+posHint:SetWidth(240)
+posHint:SetJustifyH("LEFT")
+posHint:SetText("Centered puts the row over the name at offset 0, 0.")
 
 Check("Skip my own nameplate", 268, -136,
     function() return ns.db.hideSelf end, function(v) ns.db.hideSelf = v end,
