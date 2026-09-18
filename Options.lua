@@ -266,7 +266,11 @@ panel:SetScript("OnShow", panel.refresh)
 
 if Settings and Settings.RegisterCanvasLayoutCategory then
     category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
-    category.ID = panel.name
+    -- Deliberately NOT overwriting category.ID with the addon name. That idiom is
+    -- still common (Ace3 does it) and exists so other addons can open this panel by
+    -- name, but it only ever worked because Settings.OpenToCategory used to accept a
+    -- string. On 12.x it forwards to C_SettingsUtil.OpenSettingsPanel, which wants a
+    -- numeric id and throws on a string -- taking the addon's own /command with it.
     Settings.RegisterAddOnCategory(category)
 elseif InterfaceOptions_AddCategory then
     InterfaceOptions_AddCategory(panel)
