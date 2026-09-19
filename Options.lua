@@ -56,7 +56,9 @@ local function Slider(label, x, y, lo, hi, step, get, set, fmt, parent)
     local function paint(v) text:SetText(label .. ": " .. (fmt and fmt(v) or tostring(v))) end
     s:SetScript("OnValueChanged", function(_, v)
         v = math.floor(v / step + 0.5) * step
-        set(v); paint(v); ns.RefreshAll()
+        paint(v)
+        if ns.PanelRefreshing() then return end   -- resync, not a user edit
+        set(v); ns.RefreshAll()
     end)
     refreshers[#refreshers + 1] = function() local v = get(); s:SetValue(v); paint(v) end
     return s
@@ -82,7 +84,10 @@ local function SideDropdown(x, y, parent)
         dd:SetWidth(190)
         MenuUtil.CreateRadioMenu(dd,
             function(value) return value == ns.db.side end,
-            function(value) ns.db.side = value; ns.RefreshAll() end,
+            function(value)
+                if ns.PanelRefreshing() then return end   -- resync, not a user edit
+                ns.db.side = value; ns.RefreshAll()
+            end,
             unpack(SIDES))
         refreshers[#refreshers + 1] = function() dd:GenerateMenu() end
         return dd
@@ -320,10 +325,23 @@ end
 --------------------------------------------------------------------------
 -- Register + open
 --------------------------------------------------------------------------
+-- Set while widgets are being resynced from the db, so that resyncing can never
+-- write back into it. A slider's SetValue fires OnValueChanged, and a dropdown's
+-- GenerateMenu can re-invoke its setter -- both would then "save" whatever the
+-- widget happened to be showing. That is a write triggered by a read, which is
+-- how a stale default gets laid over a loaded value.
+local refreshing = false
+function ns.PanelRefreshing() return refreshing end
+
 local function refreshPanel()
-    if not ns.db then return end
+    -- Never before ADDON_LOADED. ns.db is a stand-in full of defaults until then,
+    -- and building or refreshing against it is exactly how defaults leak into the
+    -- real table. The Settings frame can call OnRefresh during registration.
+    if not ns.dbReady then return end
     buildPanel()
+    refreshing = true
     for _, fn in ipairs(refreshers) do fn() end
+    refreshing = false
 end
 panel:SetScript("OnShow", refreshPanel)
 -- The modern Settings frame drives canvas panels through these rather than the

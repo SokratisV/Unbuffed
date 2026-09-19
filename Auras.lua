@@ -165,8 +165,18 @@ function ns.RunDiagnostics()
     -- stand-in. If this ever says false, ADDON_LOADED didn't reach us and every
     -- setting is being read from, and written to, a table nobody saves.
     print("  SavedVariables linked: " .. tostring(ns.db == UnbuffedDB)
-        .. "  |  side=" .. tostring(ns.db.side) .. " iconSize=" .. tostring(ns.db.iconSize)
-        .. " warnUnder=" .. tostring(ns.db.expiringMinutes) .. "m")
+        .. "  |  panel built against real db: " .. tostring(ns.dbReady == true))
+    local L = ns.loaded
+    if L then
+        print("  arrived from disk: side=" .. tostring(L.side) .. " iconSize=" .. tostring(L.iconSize)
+            .. " xOffset=" .. tostring(L.xOffset) .. " yOffset=" .. tostring(L.yOffset))
+    end
+    print("  in memory now:     side=" .. tostring(ns.db.side) .. " iconSize=" .. tostring(ns.db.iconSize)
+        .. " xOffset=" .. tostring(ns.db.xOffset) .. " yOffset=" .. tostring(ns.db.yOffset))
+    if L and (L.iconSize ~= ns.db.iconSize or L.side ~= ns.db.side
+        or L.xOffset ~= ns.db.xOffset or L.yOffset ~= ns.db.yOffset) then
+        print("  |cffff5555Something changed these after they loaded.|r")
+    end
 
     local isPlayer = ns.Truth(UnitIsPlayer(unit))
     local isFriend = ns.Truth(UnitIsFriend("player", unit))

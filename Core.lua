@@ -216,8 +216,22 @@ end
 --------------------------------------------------------------------------
 ns.On("ADDON_LOADED", function(_, name)
     if name ~= ADDON then return end
+    -- Snapshot what actually arrived from disk, before defaults are merged in or
+    -- anything else touches the table. "Settings lost on reload" is either a bad
+    -- save or a clobbered load, and this is the only point that can tell them
+    -- apart: /ub check prints it back.
+    ns.loaded = {
+        present  = UnbuffedDB ~= nil,
+        side     = UnbuffedDB and UnbuffedDB.side,
+        iconSize = UnbuffedDB and UnbuffedDB.iconSize,
+        xOffset  = UnbuffedDB and UnbuffedDB.xOffset,
+        yOffset  = UnbuffedDB and UnbuffedDB.yOffset,
+    }
     UnbuffedDB = copyDefaults(ns.defaults, UnbuffedDB)
     ns.db = UnbuffedDB
+    -- Nothing may read or write settings before this point. The options panel in
+    -- particular must not build itself against the stand-in table.
+    ns.dbReady = true
 end)
 
 ns.On("PLAYER_LOGIN", function()
