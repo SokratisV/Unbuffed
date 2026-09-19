@@ -166,16 +166,23 @@ function ns.RunDiagnostics()
     -- setting is being read from, and written to, a table nobody saves.
     print("  SavedVariables linked: " .. tostring(ns.db == UnbuffedDB)
         .. "  |  panel built against real db: " .. tostring(ns.dbReady == true))
-    local L = ns.loaded
-    if L then
-        print("  arrived from disk: side=" .. tostring(L.side) .. " iconSize=" .. tostring(L.iconSize)
-            .. " xOffset=" .. tostring(L.xOffset) .. " yOffset=" .. tostring(L.yOffset))
+    local function line(s)
+        if not s then return "  (not recorded)" end
+        return ("  at %-14s UnbuffedDB is %s with %d keys  side=%s iconSize=%s")
+            :format(s.when, s.kind, s.keys, tostring(s.side), tostring(s.iconSize))
     end
-    print("  in memory now:     side=" .. tostring(ns.db.side) .. " iconSize=" .. tostring(ns.db.iconSize)
-        .. " xOffset=" .. tostring(ns.db.xOffset) .. " yOffset=" .. tostring(ns.db.yOffset))
-    if L and (L.iconSize ~= ns.db.iconSize or L.side ~= ns.db.side
-        or L.xOffset ~= ns.db.xOffset or L.yOffset ~= ns.db.yOffset) then
-        print("  |cffff5555Something changed these after they loaded.|r")
+    print(line(ns.loaded))
+    print(line(ns.loadedLate))
+    print("  in memory now:  side=" .. tostring(ns.db.side) .. " iconSize=" .. tostring(ns.db.iconSize)
+        .. " tracked=" .. #ns.db.tracked)
+    if ns.loaded and ns.loaded.keys == 0 then
+        if ns.loadedLate and ns.loadedLate.keys > 0 then
+            print("  |cffffd100Saved settings arrive after ADDON_LOADED on this client|r -- picked up at login.")
+        else
+            print("  |cffff5555Saved settings never reach the addon.|r Every session starts from")
+            print("  defaults, which is why they look lost on reload. This is the client not")
+            print("  handing over SavedVariables, not the addon discarding them.")
+        end
     end
 
     local isPlayer = ns.Truth(UnitIsPlayer(unit))

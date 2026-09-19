@@ -214,24 +214,44 @@ end
 --------------------------------------------------------------------------
 -- Lifecycle
 --------------------------------------------------------------------------
-ns.On("ADDON_LOADED", function(_, name)
-    if name ~= ADDON then return end
-    -- Snapshot what actually arrived from disk, before defaults are merged in or
-    -- anything else touches the table. "Settings lost on reload" is either a bad
-    -- save or a clobbered load, and this is the only point that can tell them
-    -- apart: /ub check prints it back.
-    ns.loaded = {
-        present  = UnbuffedDB ~= nil,
-        side     = UnbuffedDB and UnbuffedDB.side,
-        iconSize = UnbuffedDB and UnbuffedDB.iconSize,
-        xOffset  = UnbuffedDB and UnbuffedDB.xOffset,
-        yOffset  = UnbuffedDB and UnbuffedDB.yOffset,
+local function snapshot(when)
+    local n = 0
+    if type(UnbuffedDB) == "table" then for _ in pairs(UnbuffedDB) do n = n + 1 end end
+    return {
+        when = when,
+        kind = type(UnbuffedDB),
+        keys = n,
+        side = type(UnbuffedDB) == "table" and UnbuffedDB.side or nil,
+        iconSize = type(UnbuffedDB) == "table" and UnbuffedDB.iconSize or nil,
     }
+end
+
+-- Take the global as our settings table, filling in anything it lacks. Kept as a
+-- function because it may have to run more than once: see the PLAYER_LOGIN handler.
+local function adoptDB()
     UnbuffedDB = copyDefaults(ns.defaults, UnbuffedDB)
     ns.db = UnbuffedDB
     -- Nothing may read or write settings before this point. The options panel in
     -- particular must not build itself against the stand-in table.
     ns.dbReady = true
+end
+
+ns.On("ADDON_LOADED", function(_, name)
+    if name ~= ADDON then return end
+    -- What actually arrived from disk, recorded before anything touches it.
+    ns.loaded = snapshot("ADDON_LOADED")
+    adoptDB()
+end)
+
+ns.On("PLAYER_LOGIN", function()
+    -- Measured on WoW Forever: UnbuffedDB is empty at ADDON_LOADED, so every
+    -- session began from defaults and nothing ever came back. This client resolves
+    -- things later than the Classic ones do -- the same lateness that kept the key
+    -- binding set unresolved at login -- so look again here. If the global is no
+    -- longer the table we adopted, the real saved values landed after us and that
+    -- is the one to keep.
+    ns.loadedLate = snapshot("PLAYER_LOGIN")
+    if UnbuffedDB ~= ns.db then adoptDB() end
 end)
 
 ns.On("PLAYER_LOGIN", function()
