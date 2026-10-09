@@ -6,6 +6,7 @@
 ## SavedVariables: UnbuffedDB
 ## IconTexture: Interface\Icons\Spell_Holy_WordFortitude
 ## X-License: MIT
+## X-Curse-Project-ID: 1735472
 
 Core.lua
 Auras.lua

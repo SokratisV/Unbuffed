@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="border" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3fe0aa"/>
+      <stop offset="1" stop-color="#1fb584"/>
+    </linearGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#24262f"/>
+      <stop offset="1" stop-color="#14151c"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#34d399" stop-opacity="0.34"/>
+      <stop offset="0.55" stop-color="#34d399" stop-opacity="0.09"/>
+      <stop offset="1" stop-color="#34d399" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="shield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff4c2"/>
+      <stop offset="1" stop-color="#f2b73a"/>
+    </linearGradient>
+    <linearGradient id="slot" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#27407a"/>
+      <stop offset="1" stop-color="#162448"/>
+    </linearGradient>
+    <linearGradient id="hp" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8ee05a"/>
+      <stop offset="0.5" stop-color="#4fb53a"/>
+      <stop offset="1" stop-color="#2f8a2c"/>
+    </linearGradient>
+    <linearGradient id="hpback" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a2f31"/>
+      <stop offset="1" stop-color="#1d1819"/>
+    </linearGradient>
+    <!-- the bar comes in from the left edge and fades out, so it reads as "the far end of a plate" -->
+    <linearGradient id="fadeL" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#000"/>
+      <stop offset="0.38" stop-color="#fff"/>
+    </linearGradient>
+    <mask id="fade" maskUnits="userSpaceOnUse" x="38" y="190" width="300" height="130">
+      <rect x="38" y="190" width="300" height="130" fill="url(#fadeL)"/>
+    </mask>
+    <clipPath id="face"><rect x="38" y="38" width="436" height="436" rx="55"/></clipPath>
+    <clipPath id="barclip"><rect x="-40" y="216" width="352" height="80" rx="40"/></clipPath>
+  </defs>
+
+  <!-- tile: thin black edge, accent border, dark face -->
+  <rect x="12" y="12" width="488" height="488" rx="80" fill="#08080c"/>
+  <rect x="16" y="16" width="480" height="480" rx="76" fill="url(#border)"/>
+  <rect x="35" y="35" width="442" height="442" rx="58" fill="#08080c"/>
+  <rect x="38" y="38" width="436" height="436" rx="55" fill="url(#face)"/>
+
+  <g clip-path="url(#face)">
+    <circle cx="388" cy="256" r="185" fill="url(#glow)"/>
+
+    <!-- far end of a nameplate: health bar + level badge -->
+    <g mask="url(#fade)">
+      <rect x="-40" y="216" width="352" height="80" rx="40" fill="#0c0b0d"/>
+      <g clip-path="url(#barclip)">
+        <rect x="-40" y="216" width="352" height="80" fill="url(#hpback)"/>
+        <rect x="-40" y="216" width="240" height="80" fill="url(#hp)"/>
+        <rect x="-40" y="216" width="352" height="26" fill="#fff" opacity="0.12"/>
+      </g>
+      <rect x="-40" y="216" width="352" height="80" rx="40" fill="none" stroke="#000" stroke-width="6"/>
+    </g>
+    <!-- the badge sits at the bar's right end, outside the fade -->
+    <rect x="232" y="226" width="72" height="60" rx="14" fill="#14110d" stroke="#000" stroke-width="5"/>
+    <rect x="236" y="230" width="64" height="52" rx="11" fill="none" stroke="#6b5420" stroke-width="2.5"/>
+    <text x="268" y="258" text-anchor="middle" dominant-baseline="central"
+          font-family="'Arial Black', Arial, sans-serif" font-weight="900" font-size="46"
+          fill="#ffd100" stroke="#000" stroke-width="4" paint-order="stroke">8</text>
+  </g>
+
+  <!-- the missing-buff icon, anchored right beside the level badge -->
+  <g transform="translate(388 256) scale(1.1) translate(-256 -216)">
+    <rect x="198" y="158" width="116" height="116" rx="24" fill="url(#slot)"/>
+    <rect x="198" y="158" width="116" height="116" rx="24" fill="none" stroke="#000" stroke-width="10"/>
+    <rect x="198" y="158" width="116" height="116" rx="24" fill="none" stroke="#5eead4" stroke-width="6" stroke-dasharray="14 10" stroke-linecap="round"/>
+    <path d="M256 180 L293 193 L293 222 C293 244 277 257 256 266 C235 257 219 244 219 222 L219 193 Z"
+          fill="url(#shield)" stroke="#000" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M256 196 V250 M232 222 H280" stroke="#a8641a" stroke-width="9" stroke-linecap="round" fill="none"/>
+  </g>
+
+  <!-- accents -->
+  <path d="M420 120 Q424 142 446 146 Q424 150 420 172 Q416 150 394 146 Q416 142 420 120 Z" fill="#fff"/>
+  <circle cx="112" cy="150" r="6" fill="#fff" opacity="0.85"/>
+  <circle cx="140" cy="368" r="5" fill="#34d399"/>
+</svg>
