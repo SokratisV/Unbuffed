@@ -98,11 +98,18 @@ ns.FALLBACK_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 --------------------------------------------------------------------------
 ns.defaults = {
     enabled   = true,
+    -- Stays empty here on purpose. The starting buffs are seeded by key, once, on a
+    -- brand-new profile (see seedTracked): copyDefaults merges tables by index, so a
+    -- default entry sitting at tracked[1] would be folded field-by-field into
+    -- whatever the user happens to have first, and would grow back after removal.
     tracked   = {},     -- ordered list of entries; see AddTracked
     iconSize  = 18,
     spacing   = 2,
-    side      = "RIGHT",
-    xOffset   = 4,
+    -- Where the icon row goes: one of the keys in ns.ANCHORS below. The first three
+    -- follow a part of the nameplate; CUSTOM measures from the plate's centre by the
+    -- two offsets, which mean nothing for the others.
+    anchor    = "LEVEL_RIGHT",
+    xOffset   = 0,
     yOffset   = 0,
     alpha     = 1,
     hideSelf  = true,   -- your own nameplate (the personal resource display)
@@ -111,6 +118,23 @@ ns.defaults = {
     refresh   = 0.5,    -- seconds between re-checks of every visible plate
     greeted   = false,
 }
+
+-- The anchor choices, in the order the panel lists them. `help` is the line the panel
+-- shows under the dropdown; nothing else reads it.
+ns.ANCHORS = {
+    { key = "LEVEL_RIGHT", label = "Right of the level text",
+      help = "Just past the level number. A plate with no level box falls back to the right end of its health bar." },
+    { key = "BAR_LEFT",    label = "Left of the health bar",
+      help = "Against the left end of the health bar." },
+    { key = "BAR_BELOW",   label = "Centered under the health bar",
+      help = "Centered beneath the health bar." },
+    { key = "CUSTOM",      label = "Custom",
+      help = "Measured from the centre of the nameplate. Set the offsets below." },
+}
+
+-- Tracked from the start on a fresh profile, so the addon does something visible
+-- before the panel is ever opened.
+ns.SEED_PRESETS = { "fortitude" }
 
 local function copyDefaults(src, dst)
     if type(dst) ~= "table" then dst = {} end
@@ -214,44 +238,52 @@ end
 --------------------------------------------------------------------------
 -- Lifecycle
 --------------------------------------------------------------------------
-local function snapshot(when)
+-- What the client handed over, recorded before anything touches it, so /ub check can
+-- tell "nothing was saved yet" from "the saved settings went missing".
+local function snapshot()
     local n = 0
     if type(UnbuffedDB) == "table" then for _ in pairs(UnbuffedDB) do n = n + 1 end end
-    return {
-        when = when,
-        kind = type(UnbuffedDB),
-        keys = n,
-        side = type(UnbuffedDB) == "table" and UnbuffedDB.side or nil,
-        iconSize = type(UnbuffedDB) == "table" and UnbuffedDB.iconSize or nil,
-    }
+    return { kind = type(UnbuffedDB), keys = n }
 end
 
--- Take the global as our settings table, filling in anything it lacks. Kept as a
--- function because it may have to run more than once: see the PLAYER_LOGIN handler.
-local function adoptDB()
+-- Put the starting buffs into a profile that has never existed. Only a brand-new
+-- profile gets them: keying this to "no saved table at all" rather than to an empty
+-- tracked list means someone who deliberately cleared the list is never handed
+-- Fortitude back, and an existing profile is never changed under its owner.
+local function seedTracked()
+    for _, key in ipairs(ns.SEED_PRESETS) do
+        for _, preset in ipairs(ns.PRESETS) do
+            if preset.key == key then
+                ns.AddTracked({
+                    key = preset.key, label = preset.label, icon = preset.icon,
+                    names = { unpack(preset.names) },
+                })
+                break
+            end
+        end
+    end
+end
+
+-- SavedVariables are populated just before ADDON_LOADED fires for this addon, and
+-- not a moment earlier, so this is the one place the saved table can be adopted.
+ns.On("ADDON_LOADED", function(_, name)
+    if name ~= ADDON then return end
+    ns.loaded = snapshot()
+    local fresh = ns.loaded.kind ~= "table"
+    -- Originally the position was a `side` of RIGHT, LEFT or CENTER plus an offset.
+    -- Carry that over to the nearest anchor, rather than letting the new default
+    -- override a choice someone made; CENTER maps exactly, since CUSTOM measures the
+    -- same way it did. Must run before copyDefaults, which would fill `anchor` in.
+    if type(UnbuffedDB) == "table" and UnbuffedDB.anchor == nil then
+        local legacy = { RIGHT = "LEVEL_RIGHT", LEFT = "BAR_LEFT", CENTER = "CUSTOM" }
+        UnbuffedDB.anchor = legacy[UnbuffedDB.side]
+    end
     UnbuffedDB = copyDefaults(ns.defaults, UnbuffedDB)
     ns.db = UnbuffedDB
     -- Nothing may read or write settings before this point. The options panel in
     -- particular must not build itself against the stand-in table.
     ns.dbReady = true
-end
-
-ns.On("ADDON_LOADED", function(_, name)
-    if name ~= ADDON then return end
-    -- What actually arrived from disk, recorded before anything touches it.
-    ns.loaded = snapshot("ADDON_LOADED")
-    adoptDB()
-end)
-
-ns.On("PLAYER_LOGIN", function()
-    -- Measured on WoW Forever: UnbuffedDB is empty at ADDON_LOADED, so every
-    -- session began from defaults and nothing ever came back. This client resolves
-    -- things later than the Classic ones do -- the same lateness that kept the key
-    -- binding set unresolved at login -- so look again here. If the global is no
-    -- longer the table we adopted, the real saved values landed after us and that
-    -- is the one to keep.
-    ns.loadedLate = snapshot("PLAYER_LOGIN")
-    if UnbuffedDB ~= ns.db then adoptDB() end
+    if fresh then seedTracked() end
 end)
 
 ns.On("PLAYER_LOGIN", function()

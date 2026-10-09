@@ -23,9 +23,32 @@ buffed player shows nothing at all, so every icon you can see is something to ca
 
 Presets cover the long-term raid buffs: Fortitude, Arcane Intellect, Mark of the Wild,
 Divine Spirit, Thorns, Battle Shout, and Blessings of Might / Wisdom / Kings.
+**Fortitude is tracked out of the box**, so the addon does something visible before
+you open the panel; untick it like any other preset if you don't want it. It is
+seeded once per profile, not re-added on every load.
 
-Appearance is configurable: icon size, opacity, horizontal and vertical offset, and
-whether the row sits right, left, or centered over the name.
+## Where the icons go
+
+The **Position** section of the settings panel has a live preview of a nameplate, so
+each choice shows what it does as you pick it. The icon row can attach to:
+
+- **Right of the level text** (the default): just past the level number.
+- **Left of the health bar**: against the bar's left end.
+- **Centered under the health bar**.
+- **Custom**: measured from the centre of the plate. The horizontal and vertical
+  offset sliders appear only while this is selected.
+
+These follow the plate's own parts, so they work at any nameplate width. A part the
+plate doesn't have falls back down a chain: level box, then health bar, then the plate
+itself -- friendly plates often have no level box, in which case the icon sits at the
+right end of the bar instead.
+
+**Look** covers icon size, opacity and spacing. **Reset position and look** (two clicks,
+no popup) puts those back to their defaults and leaves the buffs you track alone.
+
+Settings saved by an earlier version carry over: the old *right* and *left* become
+*Right of the level text* and *Left of the health bar*, and *centered* becomes *Custom*
+with its offsets unchanged.
 
 ## Buffs about to expire
 

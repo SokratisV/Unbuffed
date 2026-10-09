@@ -156,33 +156,26 @@ function ns.RunDiagnostics()
         .. " GetAuraDataBySpellName=" .. tostring(GetAuraDataBySpellName ~= nil)
         .. " GetAuraDataByIndex=" .. tostring(GetAuraDataByIndex ~= nil))
 
-    local unit = "target"
-    if ns.Truth(UnitExists(unit)) ~= true then
-        print("  |cffffd100No target.|r Target a friendly player and run this again to test live reads.")
-        return
-    end
+    -- Settings first, and needing no target: this is the report you reach for when
+    -- something looks lost, which is exactly when you may have nothing targeted.
+    --
     -- Whether ns.db is the real SavedVariables table or still the load-time
     -- stand-in. If this ever says false, ADDON_LOADED didn't reach us and every
     -- setting is being read from, and written to, a table nobody saves.
     print("  SavedVariables linked: " .. tostring(ns.db == UnbuffedDB)
         .. "  |  panel built against real db: " .. tostring(ns.dbReady == true))
-    local function line(s)
-        if not s then return "  (not recorded)" end
-        return ("  at %-14s UnbuffedDB is %s with %d keys  side=%s iconSize=%s")
-            :format(s.when, s.kind, s.keys, tostring(s.side), tostring(s.iconSize))
+    if ns.loaded then
+        print(("  at ADDON_LOADED UnbuffedDB was %s with %d keys%s"):format(
+            ns.loaded.kind, ns.loaded.keys,
+            ns.loaded.kind == "table" and "" or "  (first run: nothing saved yet)"))
     end
-    print(line(ns.loaded))
-    print(line(ns.loadedLate))
-    print("  in memory now:  side=" .. tostring(ns.db.side) .. " iconSize=" .. tostring(ns.db.iconSize)
+    print("  in memory now:  anchor=" .. tostring(ns.db.anchor) .. " iconSize=" .. tostring(ns.db.iconSize)
         .. " tracked=" .. #ns.db.tracked)
-    if ns.loaded and ns.loaded.keys == 0 then
-        if ns.loadedLate and ns.loadedLate.keys > 0 then
-            print("  |cffffd100Saved settings arrive after ADDON_LOADED on this client|r -- picked up at login.")
-        else
-            print("  |cffff5555Saved settings never reach the addon.|r Every session starts from")
-            print("  defaults, which is why they look lost on reload. This is the client not")
-            print("  handing over SavedVariables, not the addon discarding them.")
-        end
+
+    local unit = "target"
+    if ns.Truth(UnitExists(unit)) ~= true then
+        print("  |cffffd100No target.|r Target a friendly player and run this again to test live reads.")
+        return
     end
 
     local isPlayer = ns.Truth(UnitIsPlayer(unit))

@@ -41,24 +41,43 @@ local function getIcon(row, i)
     return t, fs
 end
 
--- db.side is one of "RIGHT", "LEFT" or "CENTER" (the key predates the centre
--- option; renaming it would orphan everyone's saved setting).
+-- The parts of a nameplate an icon row can attach to, found the way FlareUI finds
+-- them on WoW Forever: the health bar sits at UnitFrame.HealthBarsContainer.healthBar
+-- and the level box is UnitFrame.PlayerLevelDiffFrame. Either may be absent -- a
+-- friendly plate often has no level box, and one in name-only mode has no bar -- and
+-- a part that isn't showing has no meaningful edge, so it counts as absent too. The
+-- placement below falls back from the level box to the bar to the plate itself.
+function ns.PlateParts(plate)
+    local unitFrame = plate.UnitFrame
+    if not unitFrame then return nil, nil end
+    local container = unitFrame.HealthBarsContainer
+    local bar = container and container.healthBar
+    if bar and (bar:IsForbidden() or not bar:IsShown()) then bar = nil end
+    local level = unitFrame.PlayerLevelDiffFrame
+    if level and (level:IsForbidden() or not level:IsShown()) then level = nil end
+    return bar, level
+end
+
+local PRESET_GAP = 4   -- pixels between the icon row and the part it sits against
+
+-- Place `row` according to db.anchor. `bar` and `level` may be nil. Shared with the
+-- options panel's preview, which hands in a mock plate, so what the preview shows is
+-- decided by exactly this code and cannot drift from what the real plates do.
 --
--- The offsets mean slightly different things per position, and deliberately so.
--- Beside the plate, xOffset is a GAP: it reads as "distance away from the plate"
--- on both sides, so the sign is flipped for LEFT and a negative value pulls the
--- row back over the plate either way. Centred, there is no gap to describe, so
--- xOffset is a plain nudge -- positive right, negative left -- and 0, 0 sits the
--- row dead centre on the nameplate, over the name.
-local function anchorRow(row, plate)
-    local db = ns.db
+-- The row grows away from the part it sits against: rightwards past the level box,
+-- leftwards from the bar's left end, and outwards from the middle when centred.
+-- Only CUSTOM reads the offsets; the presets are meant to need none.
+function ns.PlaceRow(row, plate, bar, level, db)
     row:ClearAllPoints()
-    if db.side == "CENTER" then
-        row:SetPoint("CENTER", plate, "CENTER", db.xOffset, db.yOffset)
-    elseif db.side == "LEFT" then
-        row:SetPoint("RIGHT", plate, "LEFT", -db.xOffset, db.yOffset)
+    local anchor = db.anchor
+    if anchor == "LEVEL_RIGHT" then
+        row:SetPoint("LEFT", level or bar or plate, "RIGHT", PRESET_GAP, 0)
+    elseif anchor == "BAR_LEFT" then
+        row:SetPoint("RIGHT", bar or plate, "LEFT", -PRESET_GAP, 0)
+    elseif anchor == "BAR_BELOW" then
+        row:SetPoint("TOP", bar or plate, "BOTTOM", 0, -PRESET_GAP)
     else
-        row:SetPoint("LEFT", plate, "RIGHT", db.xOffset, db.yOffset)
+        row:SetPoint("CENTER", plate, "CENTER", db.xOffset, db.yOffset)
     end
 end
 
@@ -130,7 +149,8 @@ local function updatePlate(unit, plate)
         return
     end
     row:SetSize(shown * size + (shown - 1) * spacing, size)
-    anchorRow(row, plate)
+    local bar, level = ns.PlateParts(plate)
+    ns.PlaceRow(row, plate, bar, level, db)
     row:Show()
 end
 

@@ -5,30 +5,43 @@ panel.name = "Unbuffed"
 local category          -- modern Settings category, when the client has one
 local refreshers = {}   -- run on every panel show, to resync widgets with the db
 local rebuildCustomList -- forward decl
-local appearance        -- container for everything below the custom-buff list
+local content           -- the scroll child; every widget below lives in it
+local blocks = {}       -- the panel's sections, top to bottom
+local syncDependents    -- forward decl: re-reads the db into everything that hangs off it
+
+-- After the user changes something: redraw the real plates, then everything in the
+-- panel that depends on the new value (the preview, which sections show, what greys out).
+local function onChange()
+    ns.RefreshAll()
+    syncDependents()
+end
 
 --------------------------------------------------------------------------
 -- Widget helpers
 --------------------------------------------------------------------------
--- Every helper takes an optional parent so the lower half of the panel can live in
--- a container frame that slides with the length of the custom-buff list.
+-- Every helper takes an optional parent, so a section can own its widgets and be
+-- shown, hidden or moved as one piece.
 local function Header(text, x, y, parent)
-    local p = parent or panel
+    local p = parent or content
     local fs = p:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     fs:SetPoint("TOPLEFT", x, y)
     fs:SetText(text)
+    local line = p:CreateTexture(nil, "ARTWORK")
+    line:SetColorTexture(1, 0.82, 0, 0.18)
+    line:SetSize(520 - x, 1)
+    line:SetPoint("TOPLEFT", fs, "BOTTOMLEFT", 0, -3)
     return fs
 end
 
 local function Check(label, x, y, get, set, tooltip, parent)
-    local p = parent or panel
+    local p = parent or content
     local cb = CreateFrame("CheckButton", nil, p, "UICheckButtonTemplate")
     cb:SetPoint("TOPLEFT", x, y)
     cb:SetSize(24, 24)
     local fs = p:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     fs:SetPoint("LEFT", cb, "RIGHT", 2, 0)
     fs:SetText(label)
-    cb:SetScript("OnClick", function(self) set(self:GetChecked() and true or false); ns.RefreshAll() end)
+    cb:SetScript("OnClick", function(self) set(self:GetChecked() and true or false); onChange() end)
     if tooltip then
         cb:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -44,7 +57,7 @@ end
 local sliderCount = 0
 local function Slider(label, x, y, lo, hi, step, get, set, fmt, parent)
     sliderCount = sliderCount + 1
-    local s = CreateFrame("Slider", "UnbuffedSlider" .. sliderCount, parent or panel, "OptionsSliderTemplate")
+    local s = CreateFrame("Slider", "UnbuffedSlider" .. sliderCount, parent or content, "OptionsSliderTemplate")
     s:SetWidth(190)
     s:SetPoint("TOPLEFT", x, y)
     s:SetMinMaxValues(lo, hi)
@@ -58,54 +71,69 @@ local function Slider(label, x, y, lo, hi, step, get, set, fmt, parent)
         v = math.floor(v / step + 0.5) * step
         paint(v)
         if ns.PanelRefreshing() then return end   -- resync, not a user edit
-        set(v); ns.RefreshAll()
+        set(v); onChange()
     end)
     refreshers[#refreshers + 1] = function() local v = get(); s:SetValue(v); paint(v) end
     return s
 end
 
-local SIDES = {
-    { "Right of the nameplate",   "RIGHT" },
-    { "Left of the nameplate",    "LEFT" },
-    { "Centered over the name",   "CENTER" },
-}
+local function Button(label, x, y, w, onClick, tooltip, parent)
+    local b = CreateFrame("Button", nil, parent or content, "UIPanelButtonTemplate")
+    b:SetSize(w, 22)
+    b:SetPoint("TOPLEFT", x, y)
+    b:SetText(label)
+    b:SetScript("OnClick", onClick)
+    if tooltip then
+        b:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(tooltip, nil, nil, nil, nil, true)
+            GameTooltip:Show()
+        end)
+        b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end
+    return b
+end
 
--- Midnight removed UIDropDownMenu; there the widget is a DropdownButton driven by
--- MenuUtil. Keep the legacy branch for the older Classic clients.
-local function SideDropdown(x, y, parent)
-    local p = parent or panel
+-- The anchor dropdown. Midnight removed UIDropDownMenu; there the widget is a
+-- DropdownButton driven by MenuUtil. Keep the legacy branch for the older Classic
+-- clients. Both list ns.ANCHORS, so the choices are defined in one place.
+local ANCHOR_CHOICES = {}
+for _, a in ipairs(ns.ANCHORS) do ANCHOR_CHOICES[#ANCHOR_CHOICES + 1] = { a.label, a.key } end
+
+local function AnchorDropdown(x, y, parent)
+    local p = parent or content
     local fs = p:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     fs:SetPoint("TOPLEFT", x, y)
-    fs:SetText("Icon row position")
+    fs:SetText("Anchor")
 
     if MenuUtil and MenuUtil.CreateRadioMenu then
         local dd = CreateFrame("DropdownButton", nil, p, "WowStyle1DropdownTemplate")
         dd:SetPoint("TOPLEFT", x, y - 18)
-        dd:SetWidth(190)
+        dd:SetWidth(240)
         MenuUtil.CreateRadioMenu(dd,
-            function(value) return value == ns.db.side end,
+            function(value) return value == ns.db.anchor end,
             function(value)
                 if ns.PanelRefreshing() then return end   -- resync, not a user edit
-                ns.db.side = value; ns.RefreshAll()
+                ns.db.anchor = value; onChange()
             end,
-            unpack(SIDES))
+            unpack(ANCHOR_CHOICES))
         refreshers[#refreshers + 1] = function() dd:GenerateMenu() end
         return dd
     end
 
-    local dd = CreateFrame("Frame", "UnbuffedSideDrop", p, "UIDropDownMenuTemplate")
+    local dd = CreateFrame("Frame", "UnbuffedAnchorDrop", p, "UIDropDownMenuTemplate")
     dd:SetPoint("TOPLEFT", x - 16, y - 18)
-    UIDropDownMenu_SetWidth(dd, 170)
+    UIDropDownMenu_SetWidth(dd, 220)
     local function setText()
-        for _, o in ipairs(SIDES) do
-            if o[2] == ns.db.side then UIDropDownMenu_SetText(dd, o[1]); return end
+        for _, o in ipairs(ANCHOR_CHOICES) do
+            if o[2] == ns.db.anchor then UIDropDownMenu_SetText(dd, o[1]); return end
         end
     end
     UIDropDownMenu_Initialize(dd, function(_, level)
-        for _, o in ipairs(SIDES) do
+        for _, o in ipairs(ANCHOR_CHOICES) do
             local info = UIDropDownMenu_CreateInfo()
-            info.text, info.checked = o[1], (o[2] == ns.db.side)
-            info.func = function() ns.db.side = o[2]; setText(); CloseDropDownMenus(); ns.RefreshAll() end
+            info.text, info.checked = o[1], (o[2] == ns.db.anchor)
+            info.func = function() ns.db.anchor = o[2]; setText(); CloseDropDownMenus(); onChange() end
             UIDropDownMenu_AddButton(info, level)
         end
     end)
@@ -114,8 +142,45 @@ local function SideDropdown(x, y, parent)
 end
 
 --------------------------------------------------------------------------
+-- Sections
+--------------------------------------------------------------------------
+-- The panel is a stack of sections, each a frame that owns its widgets. Stacking is
+-- done here rather than by hand-placed coordinates because two sections change
+-- height as you use the panel: the custom-buff list grows, and the Custom position
+-- section only exists while Custom is the anchor. Everything below just slides.
+local function Section(height, shownFn)
+    local b = CreateFrame("Frame", nil, content)
+    b:SetSize(560, height)
+    b.h, b.shownFn = height, shownFn
+    blocks[#blocks + 1] = b
+    return b
+end
+
+local function layoutBlocks()
+    local y = 0
+    for _, b in ipairs(blocks) do
+        local show = (not b.shownFn) or b.shownFn()
+        b:SetShown(show)
+        if show then
+            b:ClearAllPoints()
+            b:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
+            y = y + b.h + 10
+        end
+    end
+    content:SetHeight(y + 10)
+end
+
+--------------------------------------------------------------------------
 -- Layout
 --------------------------------------------------------------------------
+-- Everything the "Reset" button puts back: how the icons look and where they sit.
+-- Deliberately not the tracked list or the master switch -- those are what you chose
+-- to watch, not how it is drawn.
+local APPEARANCE_KEYS = {
+    "anchor", "xOffset", "yOffset", "iconSize", "spacing", "alpha",
+    "hideSelf", "flagExpiring", "expiringMinutes",
+}
+
 -- The panel is built on first show, not at load. A Settings canvas category
 -- needs a frame up front, but not a populated one -- and building widgets at
 -- load means creating them against SavedVariables that have not arrived yet.
@@ -125,27 +190,45 @@ local built = false
 local function buildPanel()
     if built then return end
     built = true
-    local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 16, -16)
+
+    -- The scroll frame is what lets the panel be longer than the window it lives in.
+    local scroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 4, -8)
+    scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -28, 8)
+    content = CreateFrame("Frame", nil, scroll)
+    content:SetSize(560, 900)
+    scroll:SetScrollChild(content)
+
+    ----------------------------------------------------------------------
+    -- Title
+    ----------------------------------------------------------------------
+    local head = Section(100)
+    local title = head:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", 16, -12)
     title:SetText("Unbuffed")
 
-    local blurb = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    blurb:SetPoint("TOPLEFT", 16, -38)
+    local blurb = head:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    blurb:SetPoint("TOPLEFT", 16, -36)
     blurb:SetWidth(520)
     blurb:SetJustifyH("LEFT")
     blurb:SetText("Shows a small icon beside a friendly player's nameplate for each tracked buff they are |cffffd100missing|r. A fully buffed player shows nothing.")
 
-    Check("Enabled", 18, -70, function() return ns.db.enabled end, function(v) ns.db.enabled = v end)
+    Check("Enabled", 18, -70, function() return ns.db.enabled end, function(v) ns.db.enabled = v end,
+        nil, head)
 
-    Header("Buffs to flag", 16, -104)
+    ----------------------------------------------------------------------
+    -- Tracking
+    ----------------------------------------------------------------------
+    local track = Section(222)
+    Header("Buffs to flag", 16, 0, track)
 
-    -- Presets, three columns: nine of them in five rows wasted enough height to
-    -- push the controls below off the bottom of the panel.
+    -- Presets, three columns: nine of them in five rows wasted enough height
+    -- to push the controls below off the bottom of the panel.
     local PRESET_COLS = 3
     for i, preset in ipairs(ns.PRESETS) do
         local col = (i - 1) % PRESET_COLS
         local row = math.floor((i - 1) / PRESET_COLS)
-        Check(preset.label, 18 + col * 174, -128 - row * 26,
+        Check(preset.label, 18 + col * 174, -28 - row * 26,
             function()
                 local e = ns.FindTracked(preset.key)
                 return e and e.enabled
@@ -162,24 +245,24 @@ local function buildPanel()
                 if rebuildCustomList then rebuildCustomList() end
             end,
             "Matched by name, so every rank counts -- and so do the group versions ("
-                .. table.concat(preset.names, ", ") .. ").")
+                .. table.concat(preset.names, ", ") .. ").", track)
     end
 
     local presetRows = math.ceil(#ns.PRESETS / PRESET_COLS)
-    local customY = -128 - presetRows * 26 - 18
+    local customY = -28 - presetRows * 26 - 12
 
-    Header("Add another buff", 16, customY)
+    Header("Add another buff", 16, customY, track)
 
-    local addBox = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
+    local addBox = CreateFrame("EditBox", nil, track, "InputBoxTemplate")
     addBox:SetSize(200, 22)
-    addBox:SetPoint("TOPLEFT", 22, customY - 26)
+    addBox:SetPoint("TOPLEFT", 22, customY - 30)
     addBox:SetAutoFocus(false)
 
-    local addHint = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-    addHint:SetPoint("TOPLEFT", 22, customY - 52)
+    local addHint = track:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    addHint:SetPoint("TOPLEFT", 22, customY - 56)
     addHint:SetText("Buff name or spell ID. A name matches every rank; an ID also survives combat.")
 
-    local addBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    local addBtn = CreateFrame("Button", nil, track, "UIPanelButtonTemplate")
     addBtn:SetSize(70, 22)
     addBtn:SetPoint("LEFT", addBox, "RIGHT", 6, 0)
     addBtn:SetText("Add")
@@ -202,9 +285,10 @@ local function buildPanel()
 
     -- Custom (non-preset) entries, each with a remove button.
     local customRows = {}
-    local customListY = customY - 76
+    local customListY = customY - 80
+    local LIST_TOP = -customListY   -- distance from the section's top to the first row
 
-    local emptyFS = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    local emptyFS = track:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     emptyFS:SetPoint("TOPLEFT", 22, customListY)
     emptyFS:SetText("No custom buffs added.")
 
@@ -219,7 +303,7 @@ local function buildPanel()
                 shown = shown + 1
                 local r = customRows[shown]
                 if not r then
-                    r = CreateFrame("Frame", nil, panel)
+                    r = CreateFrame("Frame", nil, track)
                     r:SetSize(400, 20)
                     r.icon = r:CreateTexture(nil, "ARTWORK")
                     r.icon:SetSize(16, 16)
@@ -247,78 +331,195 @@ local function buildPanel()
             end
         end
         emptyFS:SetShown(shown == 0)
-        -- Pull the rest of the panel up to sit just under the list, whatever length it
-        -- is. Guard for the first call, which runs before the container exists.
-        if appearance then
-            appearance:ClearAllPoints()
-            appearance:SetPoint("TOPLEFT", panel, "TOPLEFT", 0,
-                customListY - math.max(shown, 1) * 20 - 16)
-        end
+        -- The section is as tall as its list, so everything below follows it.
+        track.h = LIST_TOP + math.max(shown, 1) * 20 + 8
+        track:SetHeight(track.h)
+        layoutBlocks()
     end
     refreshers[#refreshers + 1] = function() rebuildCustomList() end
 
-    -- Everything below the custom list lives in this container, so the whole block can
-    -- slide with the length of that list instead of the panel reserving room for rows
-    -- that usually aren't there (and shoving the bottom controls under the Close
-    -- button when they are). rebuildCustomList positions it.
-    appearance = CreateFrame("Frame", nil, panel)
-    appearance:SetSize(1, 1)
-    -- Start where an empty list puts it; rebuildCustomList corrects it on every show.
-    appearance:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, customListY - 20 - 16)
+    ----------------------------------------------------------------------
+    -- Position
+    ----------------------------------------------------------------------
+    local pos = Section(226)
+    Header("Position", 16, 0, pos)
 
-    Header("Appearance", 16, 0, appearance)
+    -- A mock nameplate with the icon row on it, drawn by the very code the real
+    -- plates use (ns.PlaceRow), so choosing an anchor shows exactly what it does.
+    -- The plate's proportions are approximate; the icon size and spacing are real.
+    local pv = CreateFrame("Frame", nil, pos)
+    pv:SetSize(520, 100)
+    pv:SetPoint("TOPLEFT", 18, -28)
+    pv:SetClipsChildren(true)
 
+    local pvEdge = pv:CreateTexture(nil, "BACKGROUND")
+    pvEdge:SetAllPoints()
+    pvEdge:SetColorTexture(0.25, 0.25, 0.28, 1)
+    local pvFill = pv:CreateTexture(nil, "BACKGROUND", nil, 1)
+    pvFill:SetPoint("TOPLEFT", 1, -1)
+    pvFill:SetPoint("BOTTOMRIGHT", -1, 1)
+    pvFill:SetColorTexture(0.06, 0.06, 0.08, 1)
+
+    local pvCaption = pv:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    pvCaption:SetPoint("TOPLEFT", 6, -5)
+    pvCaption:SetText("Preview")
+
+    local mock = CreateFrame("Frame", nil, pv)
+    mock:SetSize(150, 34)
+    mock:SetPoint("CENTER", pv, "CENTER", -50, 10)
+
+    local bar = CreateFrame("Frame", nil, mock)
+    bar:SetSize(150, 12)
+    bar:SetPoint("BOTTOM", mock, "BOTTOM", 0, 2)
+    local barBack = bar:CreateTexture(nil, "BACKGROUND")
+    barBack:SetAllPoints()
+    barBack:SetColorTexture(0.10, 0.08, 0.08, 1)
+    local barFill = bar:CreateTexture(nil, "ARTWORK")
+    barFill:SetPoint("TOPLEFT")
+    barFill:SetPoint("BOTTOMLEFT")
+    barFill:SetWidth(100)
+    barFill:SetColorTexture(0.25, 0.70, 0.25, 1)
+
+    local level = CreateFrame("Frame", nil, mock)
+    level:SetSize(22, 18)
+    level:SetPoint("RIGHT", bar, "RIGHT", 0, 0)
+    level:SetFrameLevel(bar:GetFrameLevel() + 2)
+    local levelBack = level:CreateTexture(nil, "BACKGROUND")
+    levelBack:SetAllPoints()
+    levelBack:SetColorTexture(0.05, 0.04, 0.03, 1)
+    local levelText = level:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    levelText:SetPoint("CENTER")
+    levelText:SetText("8")
+
+    local mockName = mock:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    mockName:SetPoint("BOTTOM", bar, "TOP", 0, 3)
+    mockName:SetText("Adventurer")
+
+    -- Two demo icons, so spacing and which way the row grows are both visible.
+    local pvRow = CreateFrame("Frame", nil, pv)
+    pvRow:SetFrameLevel(pv:GetFrameLevel() + 6)
+    pvRow.icons = {}
+    for i, preset in ipairs({ ns.PRESETS[1], ns.PRESETS[3] }) do
+        local t = pvRow:CreateTexture(nil, "OVERLAY")
+        t:SetTexture(preset.icon)
+        t:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+        pvRow.icons[i] = t
+    end
+
+    local function updatePreview()
+        local db = ns.db
+        local size, gap = db.iconSize, db.spacing
+        local n = #pvRow.icons
+        for i, t in ipairs(pvRow.icons) do
+            t:ClearAllPoints()
+            t:SetPoint("LEFT", pvRow, "LEFT", (i - 1) * (size + gap), 0)
+            t:SetSize(size, size)
+            t:SetAlpha(db.alpha)
+        end
+        pvRow:SetSize(n * size + (n - 1) * gap, size)
+        ns.PlaceRow(pvRow, mock, bar, level, db)
+    end
+
+    AnchorDropdown(18, -138, pos)
+    local anchorHelp = pos:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    anchorHelp:SetPoint("TOPLEFT", 18, -190)
+    anchorHelp:SetWidth(500)
+    anchorHelp:SetJustifyH("LEFT")
+
+    ----------------------------------------------------------------------
+    -- Custom position (only while Custom is the anchor)
+    ----------------------------------------------------------------------
+    local custom = Section(88, function() return ns.db.anchor == "CUSTOM" end)
+    Header("Custom position", 16, 0, custom)
+    Slider("Horizontal offset", 18, -44, -200, 200, 1,
+        function() return ns.db.xOffset end, function(v) ns.db.xOffset = v end,
+        nil, custom)
+    Slider("Vertical offset", 268, -44, -100, 100, 1,
+        function() return ns.db.yOffset end, function(v) ns.db.yOffset = v end,
+        nil, custom)
+
+    ----------------------------------------------------------------------
+    -- Look
+    ----------------------------------------------------------------------
+    local look = Section(134)
+    Header("Look", 16, 0, look)
     Slider("Icon size", 18, -44, 8, 40, 1,
         function() return ns.db.iconSize end, function(v) ns.db.iconSize = v end,
-        nil, appearance)
+        nil, look)
     Slider("Opacity", 268, -44, 0.2, 1, 0.05,
         function() return ns.db.alpha end, function(v) ns.db.alpha = v end,
-        function(v) return ("%d%%"):format(math.floor(v * 100 + 0.5)) end, appearance)
-    -- Beside the plate this is a gap, and negative pulls the row back over the plate;
-    -- the anchor flips sign with the side so it reads the same either way. Centered
-    -- there is no gap, so it's a plain nudge and 0 sits the row over the name.
-    Slider("Horizontal offset", 18, -94, -60, 60, 1,
-        function() return ns.db.xOffset end, function(v) ns.db.xOffset = v end,
-        nil, appearance)
-    Slider("Vertical offset", 268, -94, -40, 40, 1,
-        function() return ns.db.yOffset end, function(v) ns.db.yOffset = v end,
-        nil, appearance)
+        function(v) return ("%d%%"):format(math.floor(v * 100 + 0.5)) end, look)
+    Slider("Spacing", 18, -94, 0, 12, 1,
+        function() return ns.db.spacing end, function(v) ns.db.spacing = v end,
+        nil, look)
 
-    -- Expiring buffs: same icon, tinted amber with the minutes left on it, so a
-    -- buff about to run out reads differently from one that was never cast.
-    Slider("Warn under (minutes)", 18, -144, 1, 30, 1,
-        function() return ns.db.expiringMinutes end,
-        function(v) ns.db.expiringMinutes = v end, nil, appearance)
-
-    Check("Also flag buffs about to expire", 268, -146,
+    ----------------------------------------------------------------------
+    -- Buffs about to expire
+    ----------------------------------------------------------------------
+    -- Same icon, tinted amber with the minutes left on it, so a buff about to run
+    -- out reads differently from one that was never cast.
+    local expiring = Section(116)
+    Header("Buffs about to expire", 16, 0, expiring)
+    Check("Also flag buffs about to expire", 18, -28,
         function() return ns.db.flagExpiring end, function(v) ns.db.flagExpiring = v end,
         "Shows the icon tinted amber, with the minutes left on it, once a buff drops "
             .. "below the threshold. A buff whose remaining time this client won't "
-            .. "report is never flagged.", appearance)
+            .. "report is never flagged.", expiring)
+    local warnSlider = Slider("Warn under (minutes)", 18, -76, 1, 30, 1,
+        function() return ns.db.expiringMinutes end,
+        function(v) ns.db.expiringMinutes = v end, nil, expiring)
 
-    SideDropdown(18, -196, appearance)
-
-    local posHint = appearance:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-    posHint:SetPoint("TOPLEFT", 18, -242)
-    posHint:SetWidth(240)
-    posHint:SetJustifyH("LEFT")
-    posHint:SetText("Centered puts the row over the name at offset 0, 0.")
-
-    Check("Skip my own nameplate", 268, -198,
+    ----------------------------------------------------------------------
+    -- General
+    ----------------------------------------------------------------------
+    local general = Section(96)
+    Header("General", 16, 0, general)
+    Check("Skip my own nameplate", 18, -28,
         function() return ns.db.hideSelf end, function(v) ns.db.hideSelf = v end,
-        "Leaves the personal resource display alone.", appearance)
+        "Leaves the personal resource display alone.", general)
+    Button("Run diagnostics", 18, -62, 190, function() ns.RunDiagnostics() end,
+        "Prints to chat what this client will and won't let addons read, per tracked buff, against your current target.",
+        general)
+    -- Two clicks rather than a popup: a StaticPopup shown from addon code can hang the
+    -- client in Gamepad mode, and this needs no dialog of its own. The first click arms
+    -- the button and says so; it disarms itself if the second never comes.
+    local RESET_LABEL = "Reset position and look"
+    local resetBtn, armed
+    resetBtn = Button(RESET_LABEL, 228, -62, 190, function()
+        armed = (armed or 0) + 1
+        local mine = armed
+        if resetBtn.confirming then
+            resetBtn.confirming = false
+            resetBtn:SetText(RESET_LABEL)
+            ns.ResetAppearance()
+            return
+        end
+        resetBtn.confirming = true
+        resetBtn:SetText("|cffff5555Click again to confirm|r")
+        C_Timer.After(4, function()
+            if armed == mine and resetBtn.confirming then
+                resetBtn.confirming = false
+                resetBtn:SetText(RESET_LABEL)
+            end
+        end)
+    end, "Puts the position, size, opacity and expiry settings back to their defaults. Which buffs you track is left alone.",
+        general)
 
-    local diagBtn = CreateFrame("Button", nil, appearance, "UIPanelButtonTemplate")
-    diagBtn:SetSize(190, 22)
-    diagBtn:SetPoint("TOPLEFT", 268, -228)
-    diagBtn:SetText("Run diagnostics")
-    diagBtn:SetScript("OnClick", function() ns.RunDiagnostics() end)
-    diagBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Prints to chat what this client will and won't let addons read, per tracked buff, against your current target.", nil, nil, nil, nil, true)
-        GameTooltip:Show()
-    end)
-    diagBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    ----------------------------------------------------------------------
+    -- Everything that follows from the current values
+    ----------------------------------------------------------------------
+    -- Called after every change and every resync. Nothing here writes to the db.
+    syncDependents = function()
+        for _, a in ipairs(ns.ANCHORS) do
+            if a.key == ns.db.anchor then anchorHelp:SetText(a.help) end
+        end
+        -- A greyed-out control still shows its value; it just stops taking input.
+        local on = ns.db.flagExpiring
+        warnSlider:SetAlpha(on and 1 or 0.4)
+        warnSlider:EnableMouse(on and true or false)
+        layoutBlocks()
+        updatePreview()
+    end
 end
 
 
@@ -338,9 +539,14 @@ local function refreshPanel()
     -- and building or refreshing against it is exactly how defaults leak into the
     -- real table. The Settings frame can call OnRefresh during registration.
     if not ns.dbReady then return end
-    buildPanel()
+    -- The guard has to cover construction too, not just the resync afterwards.
+    -- Building a slider calls SetMinMaxValues, which can clamp the slider's value
+    -- and so fire OnValueChanged exactly as a drag would. Outside the guard, that
+    -- would run the setter and write the clamped value over a loaded one.
     refreshing = true
+    buildPanel()
     for _, fn in ipairs(refreshers) do fn() end
+    syncDependents()
     refreshing = false
 end
 panel:SetScript("OnShow", refreshPanel)
@@ -349,6 +555,13 @@ panel:SetScript("OnShow", refreshPanel)
 panel.OnRefresh = refreshPanel
 panel.OnCommit  = function() end
 panel.OnDefault = function() end
+
+-- What the Reset button does once confirmed.
+function ns.ResetAppearance()
+    for _, key in ipairs(APPEARANCE_KEYS) do ns.db[key] = ns.defaults[key] end
+    refreshPanel()
+    ns.RefreshAll()
+end
 
 if Settings and Settings.RegisterCanvasLayoutCategory then
     category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
