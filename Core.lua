@@ -104,8 +104,8 @@ ns.defaults = {
     -- whatever the user happens to have first, and would grow back after removal.
     tracked   = {},     -- ordered list of entries; see AddTracked
     iconSize  = 18,
-    iconStyle = "SQUARE",   -- one of the keys in ns.ICON_STYLES below
-    iconZoom  = 7,          -- percent of the icon art cropped from each edge; 7 is the stock look
+    iconStyle = "RING",     -- one of the keys in ns.ICON_STYLES below
+    iconZoom  = 0,          -- percent of the icon art cropped from each edge; 0 shows all of it
     spacing   = 2,
     -- Where the icon row goes: one of the keys in ns.ANCHORS below. The first three
     -- follow a part of the nameplate; CUSTOM measures from the plate's centre by the
@@ -122,8 +122,7 @@ ns.defaults = {
 }
 
 -- How each icon is drawn, in the order the panel lists them. SQUARE is the stock
--- icon and what the addon has always drawn, so it stays the default: nobody's plates
--- change look on upgrade.
+-- spell icon; RING, the default, is a round icon in a gold ring.
 ns.ICON_STYLES = {
     { key = "SQUARE", label = "Square" },
     { key = "ROUND",  label = "Round" },
@@ -249,14 +248,6 @@ end
 --------------------------------------------------------------------------
 -- Lifecycle
 --------------------------------------------------------------------------
--- What the client handed over, recorded before anything touches it, so /ub check can
--- tell "nothing was saved yet" from "the saved settings went missing".
-local function snapshot()
-    local n = 0
-    if type(UnbuffedDB) == "table" then for _ in pairs(UnbuffedDB) do n = n + 1 end end
-    return { kind = type(UnbuffedDB), keys = n }
-end
-
 -- Put the starting buffs into a profile that has never existed. Only a brand-new
 -- profile gets them: keying this to "no saved table at all" rather than to an empty
 -- tracked list means someone who deliberately cleared the list is never handed
@@ -279,8 +270,7 @@ end
 -- not a moment earlier, so this is the one place the saved table can be adopted.
 ns.On("ADDON_LOADED", function(_, name)
     if name ~= ADDON then return end
-    ns.loaded = snapshot()
-    local fresh = ns.loaded.kind ~= "table"
+    local fresh = type(UnbuffedDB) ~= "table"
     -- Originally the position was a `side` of RIGHT, LEFT or CENTER plus an offset.
     -- Carry that over to the nearest anchor, rather than letting the new default
     -- override a choice someone made; CENTER maps exactly, since CUSTOM measures the

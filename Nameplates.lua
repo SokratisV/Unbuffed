@@ -70,7 +70,7 @@ function ns.StyleIcon(t, style, alpha, zoom)
     -- the whole texture, Blizzard's own border included, and more magnifies the middle.
     -- It crops the art; it does not resize the icon, which is the size slider's job.
     -- Clamped so a bad saved value can never invert the crop.
-    local inset = math.min(0.4, math.max(0, (tonumber(zoom) or 7) / 100))
+    local inset = math.min(0.4, math.max(0, (tonumber(zoom) or ns.defaults.iconZoom) / 100))
     if t.inset ~= inset then
         t:SetTexCoord(inset, 1 - inset, inset, 1 - inset)
         t.inset = inset

@@ -490,15 +490,12 @@ local function buildPanel()
     Check("Skip my own nameplate", 18, -28,
         function() return ns.db.hideSelf end, function(v) ns.db.hideSelf = v end,
         "Leaves the personal resource display alone.", general)
-    Button("Run diagnostics", 18, -62, 190, function() ns.RunDiagnostics() end,
-        "Prints to chat what this client will and won't let addons read, per tracked buff, against your current target.",
-        general)
     -- Two clicks rather than a popup: a StaticPopup shown from addon code can hang the
     -- client in Gamepad mode, and this needs no dialog of its own. The first click arms
     -- the button and says so; it disarms itself if the second never comes.
     local RESET_LABEL = "Reset position and look"
     local resetBtn, armed
-    resetBtn = Button(RESET_LABEL, 228, -62, 190, function()
+    resetBtn = Button(RESET_LABEL, 18, -62, 190, function()
         armed = (armed or 0) + 1
         local mine = armed
         if resetBtn.confirming then
@@ -637,9 +634,7 @@ SlashCmdList.UNBUFFED = function(msg)
             print("   - " .. e.label .. (e.enabled and "" or " |cff888888(off)|r")
                 .. "  |cff888888[" .. table.concat(e.names, " / ") .. "]|r")
         end
-    elseif cmd == "check" then
-        ns.RunDiagnostics()
     else
-        ns.Print("/ub  |cff888888(settings)|r  ·  add <name|id>  ·  remove <name>  ·  list  ·  check  ·  on|off")
+        ns.Print("/ub  |cff888888(settings)|r  ·  add <name|id>  ·  remove <name>  ·  list  ·  on|off")
     end
 end

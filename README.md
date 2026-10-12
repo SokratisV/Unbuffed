@@ -3,7 +3,7 @@
 **Flags friendly player nameplates that are missing the buffs you track.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-![Version](https://img.shields.io/badge/version-1.1.0-brightgreen)
+![Version](https://img.shields.io/badge/version-1.2.0-brightgreen)
 ![WoW](https://img.shields.io/badge/WoW-Forever%20%2F%20TBC%20Classic-f8b700)
 ![Interface](https://img.shields.io/badge/interface-16001%20%7C%2020505-555)
 
@@ -19,7 +19,6 @@ buffed player shows nothing at all, so every icon you can see is something to ca
 - `/unbuffed` (or `/ub`) opens the settings panel. Tick the buffs to flag.
 - `/ub add <name or spell ID>` adds anything not in the preset list.
 - `/ub remove <name>`, `/ub list`, `/ub on`, `/ub off`.
-- `/ub check` prints diagnostics — see **When icons don't appear** below.
 
 Presets cover the long-term raid buffs: Fortitude, Arcane Intellect, Mark of the Wild,
 Divine Spirit, Thorns, Battle Shout, and Blessings of Might / Wisdom / Kings.
@@ -47,14 +46,13 @@ right end of the bar instead.
 
 **Icon zoom** crops into or out of the icon art. At 0% you see the whole texture,
 including Blizzard's own border; higher values magnify the middle. It is separate from
-icon size, which changes how big the icon is. The default, 7%, is the crop the addon
-has always used, so nothing changes until you move it.
+icon size, which changes how big the icon is. The default is 0%, the whole icon.
 
 The styles are:
 
-- **Square**: the stock spell icon (the default).
+- **Square**: the stock spell icon.
 - **Round**: the icon clipped to a circle.
-- **Gold ring**: the round icon inside a gold ring.
+- **Gold ring** (the default): the round icon inside a gold ring.
 
 The round styles use Blizzard's own circle art, so they ship nothing of their own, and
 they are offered only on clients that have it; elsewhere the choice is just Square.
@@ -107,12 +105,11 @@ clamped down, which is worse than drawing nothing.
 
 ### When icons don't appear
 
-Run `/ub check` with a friendly player targeted. It prints, per tracked buff, whether
-this client answered and what it said, plus whether auras are restricted right now and
-whether unit identity is readable. That turns "it isn't working" into a specific cause.
+The usual reason is simply that **friendly player nameplates are switched off** — the
+addon says so once at login if it detects that.
 
-The other common reason is simply that **friendly player nameplates are switched off** —
-the addon says so once at login if it detects that.
+Another nameplate addon, or a UI suite's own nameplates, can also replace the default
+plates in a way that hides the icons. Try with the other addon disabled.
 
 ## License
 
