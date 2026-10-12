@@ -186,7 +186,7 @@ end
 -- Deliberately not the tracked list or the master switch -- those are what you chose
 -- to watch, not how it is drawn.
 local APPEARANCE_KEYS = {
-    "anchor", "xOffset", "yOffset", "iconSize", "iconStyle", "spacing", "alpha",
+    "anchor", "xOffset", "yOffset", "iconSize", "iconStyle", "iconZoom", "spacing", "alpha",
     "hideSelf", "flagExpiring", "expiringMinutes",
 }
 
@@ -423,7 +423,7 @@ local function buildPanel()
             t:SetPoint("LEFT", pvRow, "LEFT", (i - 1) * (size + gap), 0)
             t:SetSize(size, size)
             t:SetAlpha(db.alpha)
-            ns.StyleIcon(t, db.iconStyle, db.alpha)
+            ns.StyleIcon(t, db.iconStyle, db.alpha, db.iconZoom)
         end
         pvRow:SetSize(n * size + (n - 1) * gap, size)
         ns.PlaceRow(pvRow, mock, bar, level, db)
@@ -450,7 +450,7 @@ local function buildPanel()
     ----------------------------------------------------------------------
     -- Look
     ----------------------------------------------------------------------
-    local look = Section(150)
+    local look = Section(200)
     Header("Look", 16, 0, look)
     Slider("Icon size", 18, -44, 8, 40, 1,
         function() return ns.db.iconSize end, function(v) ns.db.iconSize = v end,
@@ -462,6 +462,9 @@ local function buildPanel()
         function() return ns.db.spacing end, function(v) ns.db.spacing = v end,
         nil, look)
     Dropdown("UnbuffedStyleDrop", "Icon style", 268, -90, 190, STYLE_CHOICES, "iconStyle", look)
+    Slider("Icon zoom", 18, -144, 0, 30, 1,
+        function() return ns.db.iconZoom end, function(v) ns.db.iconZoom = v end,
+        function(v) return v .. "%" end, look)
 
     ----------------------------------------------------------------------
     -- Buffs about to expire

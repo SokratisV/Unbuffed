@@ -105,6 +105,7 @@ ns.defaults = {
     tracked   = {},     -- ordered list of entries; see AddTracked
     iconSize  = 18,
     iconStyle = "SQUARE",   -- one of the keys in ns.ICON_STYLES below
+    iconZoom  = 7,          -- percent of the icon art cropped from each edge; 7 is the stock look
     spacing   = 2,
     -- Where the icon row goes: one of the keys in ns.ANCHORS below. The first three
     -- follow a part of the nameplate; CUSTOM measures from the plate's centre by the

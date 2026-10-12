@@ -62,9 +62,19 @@ end
 
 -- Apply a style to an icon from NewIcon. Safe to call every sweep: the mask and ring
 -- are set up once and after that only switched on or off as the style changes.
-function ns.StyleIcon(t, style, alpha)
+function ns.StyleIcon(t, style, alpha, zoom)
     local mask, ring = t.mask, t.ring
     if not ns.IconStyleSupported(style) then style = "SQUARE" end
+
+    -- Zoom is how much of the art's edge is cropped away, in percent per side: 0 shows
+    -- the whole texture, Blizzard's own border included, and more magnifies the middle.
+    -- It crops the art; it does not resize the icon, which is the size slider's job.
+    -- Clamped so a bad saved value can never invert the crop.
+    local inset = math.min(0.4, math.max(0, (tonumber(zoom) or 7) / 100))
+    if t.inset ~= inset then
+        t:SetTexCoord(inset, 1 - inset, inset, 1 - inset)
+        t.inset = inset
+    end
     if style == "ROUND" or style == "RING" then
         if not t.masked then
             if not mask.ready then
@@ -201,7 +211,7 @@ local function updatePlate(unit, plate)
                 t:SetAlpha(db.alpha)
                 t:ClearAllPoints()
                 t:SetPoint("LEFT", row, "LEFT", (shown - 1) * (size + spacing), 0)
-                ns.StyleIcon(t, db.iconStyle, db.alpha)
+                ns.StyleIcon(t, db.iconStyle, db.alpha, db.iconZoom)
                 if expiring then
                     t:SetVertexColor(EXPIRING_TINT[1], EXPIRING_TINT[2], EXPIRING_TINT[3])
                     fs:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",

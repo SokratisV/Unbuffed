@@ -43,7 +43,14 @@ plate doesn't have falls back down a chain: level box, then health bar, then the
 itself -- friendly plates often have no level box, in which case the icon sits at the
 right end of the bar instead.
 
-**Look** covers icon size, opacity, spacing and the **icon style**:
+**Look** covers icon size, opacity, spacing, **icon zoom** and the **icon style**.
+
+**Icon zoom** crops into or out of the icon art. At 0% you see the whole texture,
+including Blizzard's own border; higher values magnify the middle. It is separate from
+icon size, which changes how big the icon is. The default, 7%, is the crop the addon
+has always used, so nothing changes until you move it.
+
+The styles are:
 
 - **Square**: the stock spell icon (the default).
 - **Round**: the icon clipped to a circle.
