@@ -94,46 +94,55 @@ local function Button(label, x, y, w, onClick, tooltip, parent)
     return b
 end
 
--- The anchor dropdown. Midnight removed UIDropDownMenu; there the widget is a
--- DropdownButton driven by MenuUtil. Keep the legacy branch for the older Classic
--- clients. Both list ns.ANCHORS, so the choices are defined in one place.
-local ANCHOR_CHOICES = {}
-for _, a in ipairs(ns.ANCHORS) do ANCHOR_CHOICES[#ANCHOR_CHOICES + 1] = { a.label, a.key } end
+-- Dropdowns. Midnight removed UIDropDownMenu; there the widget is a DropdownButton
+-- driven by MenuUtil. Keep the legacy branch for the older Classic clients. The
+-- choices come from ns.ANCHORS and ns.ICON_STYLES, so each is defined in one place.
+local function Choices(list, supported)
+    local out = {}
+    for _, o in ipairs(list) do
+        if not supported or supported(o.key) then out[#out + 1] = { o.label, o.key } end
+    end
+    return out
+end
+local ANCHOR_CHOICES = Choices(ns.ANCHORS)
+local STYLE_CHOICES  = Choices(ns.ICON_STYLES, ns.IconStyleSupported)
 
-local function AnchorDropdown(x, y, parent)
+-- `key` is the db field the dropdown edits. `name` is only for the legacy branch,
+-- whose frames need a unique global name.
+local function Dropdown(name, label, x, y, width, choices, key, parent)
     local p = parent or content
     local fs = p:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     fs:SetPoint("TOPLEFT", x, y)
-    fs:SetText("Anchor")
+    fs:SetText(label)
 
     if MenuUtil and MenuUtil.CreateRadioMenu then
         local dd = CreateFrame("DropdownButton", nil, p, "WowStyle1DropdownTemplate")
         dd:SetPoint("TOPLEFT", x, y - 18)
-        dd:SetWidth(240)
+        dd:SetWidth(width)
         MenuUtil.CreateRadioMenu(dd,
-            function(value) return value == ns.db.anchor end,
+            function(value) return value == ns.db[key] end,
             function(value)
                 if ns.PanelRefreshing() then return end   -- resync, not a user edit
-                ns.db.anchor = value; onChange()
+                ns.db[key] = value; onChange()
             end,
-            unpack(ANCHOR_CHOICES))
+            unpack(choices))
         refreshers[#refreshers + 1] = function() dd:GenerateMenu() end
         return dd
     end
 
-    local dd = CreateFrame("Frame", "UnbuffedAnchorDrop", p, "UIDropDownMenuTemplate")
+    local dd = CreateFrame("Frame", name, p, "UIDropDownMenuTemplate")
     dd:SetPoint("TOPLEFT", x - 16, y - 18)
-    UIDropDownMenu_SetWidth(dd, 220)
+    UIDropDownMenu_SetWidth(dd, width - 20)
     local function setText()
-        for _, o in ipairs(ANCHOR_CHOICES) do
-            if o[2] == ns.db.anchor then UIDropDownMenu_SetText(dd, o[1]); return end
+        for _, o in ipairs(choices) do
+            if o[2] == ns.db[key] then UIDropDownMenu_SetText(dd, o[1]); return end
         end
     end
     UIDropDownMenu_Initialize(dd, function(_, level)
-        for _, o in ipairs(ANCHOR_CHOICES) do
+        for _, o in ipairs(choices) do
             local info = UIDropDownMenu_CreateInfo()
-            info.text, info.checked = o[1], (o[2] == ns.db.anchor)
-            info.func = function() ns.db.anchor = o[2]; setText(); CloseDropDownMenus(); onChange() end
+            info.text, info.checked = o[1], (o[2] == ns.db[key])
+            info.func = function() ns.db[key] = o[2]; setText(); CloseDropDownMenus(); onChange() end
             UIDropDownMenu_AddButton(info, level)
         end
     end)
@@ -177,7 +186,7 @@ end
 -- Deliberately not the tracked list or the master switch -- those are what you chose
 -- to watch, not how it is drawn.
 local APPEARANCE_KEYS = {
-    "anchor", "xOffset", "yOffset", "iconSize", "spacing", "alpha",
+    "anchor", "xOffset", "yOffset", "iconSize", "iconStyle", "spacing", "alpha",
     "hideSelf", "flagExpiring", "expiringMinutes",
 }
 
@@ -400,9 +409,8 @@ local function buildPanel()
     pvRow:SetFrameLevel(pv:GetFrameLevel() + 6)
     pvRow.icons = {}
     for i, preset in ipairs({ ns.PRESETS[1], ns.PRESETS[3] }) do
-        local t = pvRow:CreateTexture(nil, "OVERLAY")
+        local t = ns.NewIcon(pvRow)
         t:SetTexture(preset.icon)
-        t:SetTexCoord(0.07, 0.93, 0.07, 0.93)
         pvRow.icons[i] = t
     end
 
@@ -415,12 +423,13 @@ local function buildPanel()
             t:SetPoint("LEFT", pvRow, "LEFT", (i - 1) * (size + gap), 0)
             t:SetSize(size, size)
             t:SetAlpha(db.alpha)
+            ns.StyleIcon(t, db.iconStyle, db.alpha)
         end
         pvRow:SetSize(n * size + (n - 1) * gap, size)
         ns.PlaceRow(pvRow, mock, bar, level, db)
     end
 
-    AnchorDropdown(18, -138, pos)
+    Dropdown("UnbuffedAnchorDrop", "Anchor", 18, -138, 240, ANCHOR_CHOICES, "anchor", pos)
     local anchorHelp = pos:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     anchorHelp:SetPoint("TOPLEFT", 18, -190)
     anchorHelp:SetWidth(500)
@@ -441,7 +450,7 @@ local function buildPanel()
     ----------------------------------------------------------------------
     -- Look
     ----------------------------------------------------------------------
-    local look = Section(134)
+    local look = Section(150)
     Header("Look", 16, 0, look)
     Slider("Icon size", 18, -44, 8, 40, 1,
         function() return ns.db.iconSize end, function(v) ns.db.iconSize = v end,
@@ -452,6 +461,7 @@ local function buildPanel()
     Slider("Spacing", 18, -94, 0, 12, 1,
         function() return ns.db.spacing end, function(v) ns.db.spacing = v end,
         nil, look)
+    Dropdown("UnbuffedStyleDrop", "Icon style", 268, -90, 190, STYLE_CHOICES, "iconStyle", look)
 
     ----------------------------------------------------------------------
     -- Buffs about to expire

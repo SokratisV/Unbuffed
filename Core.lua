@@ -104,6 +104,7 @@ ns.defaults = {
     -- whatever the user happens to have first, and would grow back after removal.
     tracked   = {},     -- ordered list of entries; see AddTracked
     iconSize  = 18,
+    iconStyle = "SQUARE",   -- one of the keys in ns.ICON_STYLES below
     spacing   = 2,
     -- Where the icon row goes: one of the keys in ns.ANCHORS below. The first three
     -- follow a part of the nameplate; CUSTOM measures from the plate's centre by the
@@ -117,6 +118,15 @@ ns.defaults = {
     expiringMinutes = 5,     -- ...with this much left or less
     refresh   = 0.5,    -- seconds between re-checks of every visible plate
     greeted   = false,
+}
+
+-- How each icon is drawn, in the order the panel lists them. SQUARE is the stock
+-- icon and what the addon has always drawn, so it stays the default: nobody's plates
+-- change look on upgrade.
+ns.ICON_STYLES = {
+    { key = "SQUARE", label = "Square" },
+    { key = "ROUND",  label = "Round" },
+    { key = "RING",   label = "Gold ring" },
 }
 
 -- The anchor choices, in the order the panel lists them. `help` is the line the panel

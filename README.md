@@ -43,7 +43,17 @@ plate doesn't have falls back down a chain: level box, then health bar, then the
 itself -- friendly plates often have no level box, in which case the icon sits at the
 right end of the bar instead.
 
-**Look** covers icon size, opacity and spacing. **Reset position and look** (two clicks,
+**Look** covers icon size, opacity, spacing and the **icon style**:
+
+- **Square**: the stock spell icon (the default).
+- **Round**: the icon clipped to a circle.
+- **Gold ring**: the round icon inside a gold ring.
+
+The round styles use Blizzard's own circle art, so they ship nothing of their own, and
+they are offered only on clients that have it; elsewhere the choice is just Square.
+The preview in the Position section shows the style you pick.
+
+**Reset position and look** (two clicks,
 no popup) puts those back to their defaults and leaves the buffs you track alone.
 
 Settings saved by an earlier version carry over: the old *right* and *left* become

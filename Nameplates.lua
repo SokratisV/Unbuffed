@@ -22,6 +22,84 @@ local function getRow(plate)
     return row
 end
 
+-- Icon looks. SQUARE is the stock icon with its border trimmed, which is what the
+-- addon has always drawn. ROUND clips it to a circle, and RING puts a gold ring round
+-- that. Both use Blizzard's own atlases -- the ones FlareUI uses for its round aura
+-- icons -- so there is no art of ours to ship. The options preview builds its icons
+-- through these same two functions, so it cannot drift from the real ones.
+local ROUND_MASK  = "talents-node-circle-mask"
+local RING_ART    = "talents-node-circle-gray"   -- grey art, so it takes a tint
+local RING_TINT   = { 1.0, 0.82, 0.25 }
+local IGNORE_SIZE = TextureKitConstants and TextureKitConstants.IgnoreAtlasSize
+
+-- Those atlases are known to exist on Forever, but this addon also runs on TBC
+-- Classic, where they may not. A style is offered, and drawn, only when the client
+-- confirms it has the art; otherwise it quietly falls back to SQUARE.
+local supported = {}
+local function atlasKnown(name)
+    return C_Texture ~= nil and C_Texture.GetAtlasInfo ~= nil and C_Texture.GetAtlasInfo(name) ~= nil
+end
+function ns.IconStyleSupported(style)
+    if supported[style] == nil then
+        if style == "ROUND" then supported[style] = atlasKnown(ROUND_MASK)
+        elseif style == "RING" then supported[style] = atlasKnown(ROUND_MASK) and atlasKnown(RING_ART)
+        else supported[style] = true end
+    end
+    return supported[style]
+end
+
+-- An icon texture plus the two extras a style may use: a mask and a ring.
+function ns.NewIcon(parent)
+    local t = parent:CreateTexture(nil, "OVERLAY")
+    t:SetDrawLayer("OVERLAY", 0)
+    t:SetTexCoord(0.07, 0.93, 0.07, 0.93)   -- trim the stock icon border
+    t.mask = parent:CreateMaskTexture()
+    t.ring = parent:CreateTexture(nil, "OVERLAY")
+    t.ring:SetDrawLayer("OVERLAY", 1)       -- over the icon, under the minutes label
+    t.ring:Hide()
+    return t
+end
+
+-- Apply a style to an icon from NewIcon. Safe to call every sweep: the mask and ring
+-- are set up once and after that only switched on or off as the style changes.
+function ns.StyleIcon(t, style, alpha)
+    local mask, ring = t.mask, t.ring
+    if not ns.IconStyleSupported(style) then style = "SQUARE" end
+    if style == "ROUND" or style == "RING" then
+        if not t.masked then
+            if not mask.ready then
+                mask:SetAtlas(ROUND_MASK, IGNORE_SIZE)
+                mask:SetAllPoints(t)
+                mask.ready = true
+            end
+            t:AddMaskTexture(mask)
+            t.masked = true
+        end
+    elseif t.masked then
+        t:RemoveMaskTexture(mask)
+        t.masked = false
+    end
+
+    if style == "RING" then
+        if not ring.ready then
+            ring:SetAtlas(RING_ART, IGNORE_SIZE)
+            ring:SetAllPoints(t)
+            ring:SetVertexColor(RING_TINT[1], RING_TINT[2], RING_TINT[3])
+            ring.ready = true
+        end
+        ring:SetAlpha(alpha or 1)
+        ring:Show()
+    else
+        ring:Hide()
+    end
+end
+
+-- The ring is its own region, so hiding the icon alone would leave it behind.
+function ns.HideIcon(t)
+    t:Hide()
+    t.ring:Hide()
+end
+
 -- Amber for "running out", so it reads as a warning rather than the plain
 -- full-colour icon that means "not buffed at all".
 local EXPIRING_TINT = { 1.0, 0.72, 0.15 }
@@ -29,9 +107,7 @@ local EXPIRING_TINT = { 1.0, 0.72, 0.15 }
 local function getIcon(row, i)
     local t = row.icons[i]
     if t then return t, row.labels[i] end
-    t = row:CreateTexture(nil, "OVERLAY")
-    t:SetDrawLayer("OVERLAY", 0)
-    t:SetTexCoord(0.07, 0.93, 0.07, 0.93)   -- trim the stock icon border
+    t = ns.NewIcon(row)
     -- Minutes left, drawn above the icon so a expiring buff says how urgent it is.
     local fs = row:CreateFontString(nil, "OVERLAY")
     fs:SetDrawLayer("OVERLAY", 2)
@@ -125,6 +201,7 @@ local function updatePlate(unit, plate)
                 t:SetAlpha(db.alpha)
                 t:ClearAllPoints()
                 t:SetPoint("LEFT", row, "LEFT", (shown - 1) * (size + spacing), 0)
+                ns.StyleIcon(t, db.iconStyle, db.alpha)
                 if expiring then
                     t:SetVertexColor(EXPIRING_TINT[1], EXPIRING_TINT[2], EXPIRING_TINT[3])
                     fs:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",
@@ -140,7 +217,7 @@ local function updatePlate(unit, plate)
         end
     end
     for i = shown + 1, #row.icons do
-        row.icons[i]:Hide()
+        ns.HideIcon(row.icons[i])
         row.labels[i]:Hide()
     end
 
