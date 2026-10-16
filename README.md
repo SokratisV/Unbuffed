@@ -32,6 +32,17 @@ Under the class list, **Active buffs** shows everything currently tracked, which
 class it came from (or none, for a buff added by name), each with a button to drop it.
 Unticking a buff in its class does the same.
 
+Hover any buff, in the class list or the Active list, for its tooltip: the game's own
+description of the spell, for the **rank that suits your character's level** -- the
+highest rank you could have learned by now, so a level-25 character sees Blessing of Might
+rank 3 and a level-60 one rank 6. A character below a buff's first rank sees that rank,
+with a note saying at which level it is learned. The ranks come from the trainer data for
+your client (Forever's or TBC's), so a TBC character sees the TBC-only higher ranks.
+Buffs with no level-based rank have a plain tooltip instead, naming what they match:
+Blessing of Sanctuary and Blood Pact (talent and pet spells, in no trainer list) and, on
+TBC, Blessing of Kings (a talent there). A buff you added by spell ID shows exactly that
+spell.
+
 A Rogue has no buffs of that kind, so that class's list is empty; anything else can
 always be added by name or spell ID. A few buffs exist only on the TBC clients
 (Commanding Shout, Tranquil Air, Wrath of Air Totem) and are left out on Forever.

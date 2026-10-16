@@ -95,6 +95,72 @@ ns.CLASS_BUFFS = {
     },
 }
 
+-- Which rank of a buff's spell suits a character's level: { level it is learned at, spell id },
+-- lowest rank first. Taken from TrainerSpells' trainer data (Forever's and TBC's), in which every
+-- family below was checked to run through consecutive rank numbers at increasing levels. `tbc` is
+-- given only where the TBC client differs from Forever (extra high ranks, usually); a buff with no
+-- entry for a client has no level-based rank there -- talents, pet spells and quest spells are
+-- not in any trainer list -- and gets a plain tooltip instead.
+ns.RANKS = {
+    amplify = { forever = { { 18, 1008 }, { 30, 8455 }, { 42, 10169 }, { 54, 10170 } }, tbc = { { 18, 1008 }, { 30, 8455 }, { 42, 10169 }, { 54, 10170 }, { 63, 27130 }, { 69, 33946 } } },
+    aspectpack = { forever = { { 40, 13159 } } },
+    aspectwild = { forever = { { 46, 20043 }, { 56, 20190 } }, tbc = { { 46, 20043 }, { 56, 20190 }, { 68, 27045 } } },
+    bshout = { forever = { { 1, 6673 }, { 12, 5242 }, { 22, 6192 }, { 32, 11549 }, { 42, 11550 }, { 52, 11551 } }, tbc = { { 1, 6673 }, { 12, 5242 }, { 22, 6192 }, { 32, 11549 }, { 42, 11550 }, { 52, 11551 }, { 60, 25289 } } },
+    concentration = { forever = { { 22, 19746 } } },
+    cshout = { tbc = { { 68, 469 } } },
+    dampen = { forever = { { 12, 604 }, { 24, 8450 }, { 36, 8451 }, { 48, 10173 }, { 60, 10174 } }, tbc = { { 12, 604 }, { 24, 8450 }, { 36, 8451 }, { 48, 10173 }, { 60, 10174 }, { 67, 33944 } } },
+    devotion = { forever = { { 1, 465 }, { 10, 10290 }, { 20, 643 }, { 30, 10291 }, { 40, 1032 }, { 50, 10292 }, { 60, 10293 } }, tbc = { { 1, 465 }, { 10, 10290 }, { 20, 643 }, { 30, 10291 }, { 40, 1032 }, { 50, 10292 }, { 60, 10293 }, { 70, 27149 } } },
+    fearward = { forever = { { 20, 6346 } } },
+    fireres = { forever = { { 28, 8184 }, { 42, 10537 }, { 58, 10538 } }, tbc = { { 28, 8184 }, { 42, 10537 }, { 58, 10538 }, { 68, 25563 } } },
+    fireresaura = { forever = { { 36, 19891 }, { 48, 19899 }, { 60, 19900 } }, tbc = { { 36, 19891 }, { 48, 19899 }, { 60, 19900 }, { 70, 27153 } } },
+    fortitude = { forever = { { 1, 1243 }, { 12, 1244 }, { 24, 1245 }, { 36, 2791 }, { 48, 10937 }, { 60, 10938 } }, tbc = { { 1, 1243 }, { 12, 1244 }, { 24, 1245 }, { 36, 2791 }, { 48, 10937 }, { 60, 10938 }, { 70, 25389 } } },
+    frostres = { forever = { { 24, 8181 }, { 38, 10478 }, { 54, 10479 } }, tbc = { { 24, 8181 }, { 38, 10478 }, { 54, 10479 }, { 67, 25560 } } },
+    frostresaura = { forever = { { 32, 19888 }, { 44, 19897 }, { 56, 19898 } }, tbc = { { 32, 19888 }, { 44, 19897 }, { 56, 19898 }, { 68, 27152 } } },
+    grace = { forever = { { 42, 8835 }, { 56, 10627 } }, tbc = { { 42, 8835 }, { 56, 10627 }, { 60, 25359 } } },
+    healstream = { forever = { { 30, 6375 }, { 40, 6377 }, { 50, 10462 }, { 60, 10463 } }, tbc = { { 30, 6375 }, { 40, 6377 }, { 50, 10462 }, { 60, 10463 }, { 69, 25567 } } },
+    intellect = { forever = { { 1, 1459 }, { 14, 1460 }, { 28, 1461 }, { 42, 10156 }, { 56, 10157 } }, tbc = { { 1, 1459 }, { 14, 1460 }, { 28, 1461 }, { 42, 10156 }, { 56, 10157 }, { 70, 27126 } } },
+    kings = { forever = { { 20, 20217 } }, tbc = {  } },
+    light = { forever = { { 40, 19977 }, { 50, 19978 }, { 60, 19979 } }, tbc = { { 40, 19977 }, { 50, 19978 }, { 60, 19979 }, { 69, 27144 } } },
+    manaspring = { forever = { { 26, 5675 }, { 36, 10495 }, { 46, 10496 }, { 56, 10497 } }, tbc = { { 26, 5675 }, { 36, 10495 }, { 46, 10496 }, { 56, 10497 }, { 65, 25570 } } },
+    might = { forever = { { 4, 19740 }, { 12, 19834 }, { 22, 19835 }, { 32, 19836 }, { 42, 19837 }, { 52, 19838 } }, tbc = { { 4, 19740 }, { 12, 19834 }, { 22, 19835 }, { 32, 19836 }, { 42, 19837 }, { 52, 19838 }, { 60, 25291 }, { 70, 27140 } } },
+    motw = { forever = { { 1, 1126 }, { 10, 5232 }, { 20, 6756 }, { 30, 5234 }, { 40, 8907 }, { 50, 9884 }, { 60, 9885 } }, tbc = { { 1, 1126 }, { 10, 5232 }, { 20, 6756 }, { 30, 5234 }, { 40, 8907 }, { 50, 9884 }, { 60, 9885 }, { 70, 26990 } } },
+    natureres = { forever = { { 30, 10595 }, { 44, 10600 }, { 60, 10601 } }, tbc = { { 30, 10595 }, { 44, 10600 }, { 60, 10601 }, { 69, 25574 } } },
+    retribution = { forever = { { 16, 7294 }, { 26, 10298 }, { 36, 10299 }, { 46, 10300 }, { 56, 10301 } }, tbc = { { 16, 7294 }, { 26, 10298 }, { 36, 10299 }, { 46, 10300 }, { 56, 10301 }, { 66, 27150 } } },
+    salvation = { forever = { { 26, 1038 } } },
+    shadowprot = { forever = { { 30, 976 }, { 42, 10957 }, { 56, 10958 } }, tbc = { { 30, 976 }, { 42, 10957 }, { 56, 10958 }, { 68, 25433 } } },
+    shadowresaura = { forever = { { 28, 19876 }, { 40, 19895 }, { 52, 19896 } }, tbc = { { 28, 19876 }, { 40, 19895 }, { 52, 19896 }, { 63, 27151 } } },
+    soulstone = { forever = { { 18, 693 }, { 30, 20752 }, { 40, 20755 }, { 50, 20756 }, { 60, 20757 } }, tbc = { { 18, 693 }, { 30, 20752 }, { 40, 20755 }, { 50, 20756 }, { 60, 20757 }, { 70, 27238 } } },
+    spirit = { forever = { { 30, 14752 }, { 40, 14818 }, { 50, 14819 }, { 60, 27841 } }, tbc = { { 40, 14818 }, { 50, 14819 }, { 60, 27841 }, { 70, 25312 } } },
+    stoneskin = { forever = { { 14, 8154 }, { 24, 8155 }, { 34, 10406 }, { 44, 10407 }, { 54, 10408 } }, tbc = { { 14, 8154 }, { 24, 8155 }, { 34, 10406 }, { 44, 10407 }, { 54, 10408 }, { 63, 25508 }, { 70, 25509 } } },
+    strength = { forever = { { 10, 8075 }, { 24, 8160 }, { 38, 8161 }, { 52, 10442 } }, tbc = { { 10, 8075 }, { 24, 8160 }, { 38, 8161 }, { 52, 10442 }, { 60, 25361 }, { 65, 25528 } } },
+    thorns = { forever = { { 6, 467 }, { 14, 782 }, { 24, 1075 }, { 34, 8914 }, { 44, 9756 }, { 54, 9910 } }, tbc = { { 6, 467 }, { 14, 782 }, { 24, 1075 }, { 34, 8914 }, { 44, 9756 }, { 54, 9910 }, { 64, 26992 } } },
+    tranquil = { tbc = { { 50, 25908 } } },
+    trueshot = { forever = { { 40, 19506 }, { 50, 20905 }, { 60, 20906 } }, tbc = { { 50, 20905 }, { 60, 20906 }, { 70, 27066 } } },
+    unendbreath = { forever = { { 16, 5697 } } },
+    windfury = { forever = { { 32, 8512 }, { 42, 10613 }, { 52, 10614 } }, tbc = { { 32, 8512 }, { 42, 10613 }, { 52, 10614 }, { 61, 25585 }, { 70, 25587 } } },
+    wisdom = { forever = { { 14, 19742 }, { 24, 19850 }, { 34, 19852 }, { 44, 19853 }, { 54, 19854 } }, tbc = { { 14, 19742 }, { 24, 19850 }, { 34, 19852 }, { 44, 19853 }, { 54, 19854 }, { 60, 25290 }, { 65, 27142 } } },
+    wrathofair = { tbc = { { 64, 3738 } } },
+}
+
+-- The spell id of the rank that suits `level`, and the level that rank is learned at: the highest
+-- rank learned at or below the level. A character below the first rank gets that first rank (the
+-- second value then exceeds their level, so the caller can say so). nil when this client has no
+-- level-based rank for the buff, which is the signal to show a plain tooltip.
+function ns.RankFor(key, level)
+    local r = ns.RANKS[key]
+    if not r then return nil end
+    -- Spelled out, not `a and b or c`: that would fall through to the TBC list on Forever for a
+    -- buff that has none of its own there.
+    local list
+    if ns.IsForever then list = r.forever else list = r.tbc or r.forever end
+    if not list or #list == 0 then return nil end
+    local pick = list[1]
+    for _, rank in ipairs(list) do
+        if rank[1] <= level then pick = rank else break end
+    end
+    return pick[2], pick[1]
+end
+
 -- The playable classes on the clients this addon supports, in no particular order --
 -- the panel sorts them by their localized names. A fixed list rather than asking the
 -- client, which on Forever could name classes that do not exist in this game.

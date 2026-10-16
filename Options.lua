@@ -93,6 +93,44 @@ local function Button(label, x, y, w, onClick, tooltip, parent)
     return b
 end
 
+-- The tooltip for a buff in the panel: the game's own spell tooltip for the rank that suits the
+-- character's level, then a line saying so, then what the buff is matched by. `key` names a
+-- listed buff; `ids` is the spell id someone typed, for one added by id, whose exact rank is
+-- theirs to have chosen and is shown as it is. A buff with no level-based rank on this client
+-- (see ns.RankFor), or one the client will not describe, gets just its name.
+local TIP_GREY = { 0.62, 0.62, 0.62 }
+local function ShowBuffTooltip(owner, key, label, names, ids)
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    local level = UnitLevel("player") or 1
+    local spellID, learnedAt, byLevel
+    if key then
+        spellID, learnedAt = ns.RankFor(key, level)
+        byLevel = spellID ~= nil
+    end
+    if not spellID and ids and ids[1] then spellID = ids[1] end
+
+    local described = false
+    if spellID and GameTooltip.SetSpellByID then
+        GameTooltip:SetSpellByID(spellID)
+        described = GameTooltip:NumLines() > 0
+    end
+    if not described then
+        GameTooltip:ClearLines()
+        GameTooltip:AddLine(label, 1, 1, 1)
+    end
+    if described and byLevel then
+        GameTooltip:AddLine(" ")
+        if learnedAt > level then
+            GameTooltip:AddLine(("Your level (%d) is below this buff's first rank, which is learned at level %d."):format(level, learnedAt), 1, 0.82, 0, true)
+        else
+            GameTooltip:AddLine(("Showing the rank for your level (%d)."):format(level), TIP_GREY[1], TIP_GREY[2], TIP_GREY[3])
+        end
+    end
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("Matched by name: " .. table.concat(names or {}, ", ") .. ".", TIP_GREY[1], TIP_GREY[2], TIP_GREY[3], true)
+    GameTooltip:Show()
+end
+
 -- Dropdowns. Midnight removed UIDropDownMenu; there the widget is a DropdownButton
 -- driven by MenuUtil. Keep the legacy branch for the older Classic clients. The
 -- choices come from ns.ANCHORS and ns.ICON_STYLES, so each is defined in one place.
@@ -274,10 +312,7 @@ local function buildPanel()
             onChange()
         end)
         w:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetText("Matched by name, so every rank counts -- and so do the group versions ("
-                .. table.concat(self.preset.names, ", ") .. ").", nil, nil, nil, nil, true)
-            GameTooltip:Show()
+            ShowBuffTooltip(self, self.preset.key, self.preset.label, self.preset.names)
         end)
         w:SetScript("OnLeave", function() GameTooltip:Hide() end)
         gridPool[i] = w
@@ -328,6 +363,15 @@ local function buildPanel()
         if c then return c end
         c = CreateFrame("Frame", nil, track)
         c:SetSize(GRID_W - 6, 22)
+        c:EnableMouse(true)
+        c:SetScript("OnEnter", function(self)
+            local e = self.entry
+            if not e then return end
+            -- a listed buff gets its level-appropriate rank; one added by name or id is shown as it is
+            local listed = ns.FindPreset(e.key) and e.key or nil
+            ShowBuffTooltip(self, listed, e.label or e.key, e.names, e.ids)
+        end)
+        c:SetScript("OnLeave", function() GameTooltip:Hide() end)
         c.icon = c:CreateTexture(nil, "ARTWORK")
         c.icon:SetSize(16, 16)
         c.icon:SetPoint("LEFT", 0, 0)
