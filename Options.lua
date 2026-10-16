@@ -413,7 +413,9 @@ local function buildPanel()
         t:SetTexture(preset.icon)
         pvRow.icons[i] = t
     end
-    local pvTimer = pvRow:CreateFontString(nil, "OVERLAY")
+    -- A font template, not just a layer: a FontString with no font raises "Font not set" the
+    -- moment it is given text, which here would abort the build of the whole panel.
+    local pvTimer = pvRow:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     pvTimer:SetDrawLayer("OVERLAY", 2)
     pvTimer:SetPoint("BOTTOMRIGHT", pvRow.icons[3], "BOTTOMRIGHT", 2, -2)
     pvTimer:SetText("4m")
