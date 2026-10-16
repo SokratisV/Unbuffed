@@ -106,6 +106,7 @@ local function Choices(list, supported)
 end
 local ANCHOR_CHOICES = Choices(ns.ANCHORS)
 local STYLE_CHOICES  = Choices(ns.ICON_STYLES, ns.IconStyleSupported)
+local EXPIRE_CHOICES = Choices(ns.EXPIRE_STYLES)
 
 -- `key` is the db field the dropdown edits. `name` is only for the legacy branch,
 -- whose frames need a unique global name.
@@ -187,7 +188,7 @@ end
 -- to watch, not how it is drawn.
 local APPEARANCE_KEYS = {
     "anchor", "xOffset", "yOffset", "iconSize", "iconStyle", "iconZoom", "spacing", "alpha",
-    "hideSelf", "flagExpiring", "expiringMinutes",
+    "hideSelf", "flagExpiring", "expiringMinutes", "expireStyle", "expireAlpha",
 }
 
 -- The panel is built on first show, not at load. A Settings canvas category
@@ -211,7 +212,7 @@ local function buildPanel()
     ----------------------------------------------------------------------
     -- Title
     ----------------------------------------------------------------------
-    local head = Section(100)
+    local head = Section(70)
     local title = head:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 16, -12)
     title:SetText("Unbuffed")
@@ -221,9 +222,6 @@ local function buildPanel()
     blurb:SetWidth(520)
     blurb:SetJustifyH("LEFT")
     blurb:SetText("Shows a small icon beside a friendly player's nameplate for each tracked buff they are |cffffd100missing|r. A fully buffed player shows nothing.")
-
-    Check("Enabled", 18, -70, function() return ns.db.enabled end, function(v) ns.db.enabled = v end,
-        nil, head)
 
     ----------------------------------------------------------------------
     -- Tracking
@@ -404,26 +402,50 @@ local function buildPanel()
     mockName:SetPoint("BOTTOM", bar, "TOP", 0, 3)
     mockName:SetText("Adventurer")
 
-    -- Two demo icons, so spacing and which way the row grows are both visible.
+    -- Demo icons, so spacing and which way the row grows are both visible. The third is
+    -- the "about to expire" example, with its timer, so the expiring look can be judged
+    -- here too; it appears only while expiry flagging is on.
     local pvRow = CreateFrame("Frame", nil, pv)
     pvRow:SetFrameLevel(pv:GetFrameLevel() + 6)
     pvRow.icons = {}
-    for i, preset in ipairs({ ns.PRESETS[1], ns.PRESETS[3] }) do
+    for i, preset in ipairs({ ns.PRESETS[1], ns.PRESETS[3], ns.PRESETS[2] }) do
         local t = ns.NewIcon(pvRow)
         t:SetTexture(preset.icon)
         pvRow.icons[i] = t
     end
+    local pvTimer = pvRow:CreateFontString(nil, "OVERLAY")
+    pvTimer:SetDrawLayer("OVERLAY", 2)
+    pvTimer:SetPoint("BOTTOMRIGHT", pvRow.icons[3], "BOTTOMRIGHT", 2, -2)
+    pvTimer:SetText("4m")
 
     local function updatePreview()
         local db = ns.db
         local size, gap = db.iconSize, db.spacing
-        local n = #pvRow.icons
+        local n = db.flagExpiring and 3 or 2
         for i, t in ipairs(pvRow.icons) do
-            t:ClearAllPoints()
-            t:SetPoint("LEFT", pvRow, "LEFT", (i - 1) * (size + gap), 0)
-            t:SetSize(size, size)
-            t:SetAlpha(db.alpha)
-            ns.StyleIcon(t, db.iconStyle, db.alpha, db.iconZoom)
+            if i > n then
+                ns.HideIcon(t)
+            else
+                local alpha, r, g, b = db.alpha, 1, 1, 1
+                if i == 3 then   -- the expiring example
+                    local er, eg, eb, ea = ns.ExpiringLook(db)
+                    r, g, b, alpha = er, eg, eb, db.alpha * ea
+                end
+                t:ClearAllPoints()
+                t:SetPoint("LEFT", pvRow, "LEFT", (i - 1) * (size + gap), 0)
+                t:SetSize(size, size)
+                t:SetAlpha(alpha)
+                t:SetVertexColor(r, g, b)
+                ns.StyleIcon(t, db.iconStyle, alpha, db.iconZoom)
+                t:Show()
+            end
+        end
+        if n == 3 then
+            pvTimer:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", math.max(7, math.floor(size * 0.46)), "OUTLINE")
+            pvTimer:SetAlpha(1)   -- the timer never fades with its icon
+            pvTimer:Show()
+        else
+            pvTimer:Hide()
         end
         pvRow:SetSize(n * size + (n - 1) * gap, size)
         ns.PlaceRow(pvRow, mock, bar, level, db)
@@ -469,18 +491,22 @@ local function buildPanel()
     ----------------------------------------------------------------------
     -- Buffs about to expire
     ----------------------------------------------------------------------
-    -- Same icon, tinted amber with the minutes left on it, so a buff about to run
-    -- out reads differently from one that was never cast.
-    local expiring = Section(116)
+    -- The same icon with the minutes left on it, told apart from one that was never
+    -- cast either by an amber tint or by fading. Only the icon fades, never the timer.
+    local expiring = Section(164)
     Header("Buffs about to expire", 16, 0, expiring)
     Check("Also flag buffs about to expire", 18, -28,
         function() return ns.db.flagExpiring end, function(v) ns.db.flagExpiring = v end,
-        "Shows the icon tinted amber, with the minutes left on it, once a buff drops "
-            .. "below the threshold. A buff whose remaining time this client won't "
-            .. "report is never flagged.", expiring)
+        "Keeps the icon showing, with the minutes left on it, once a buff drops "
+            .. "below the threshold -- tinted amber or faded, as chosen below. A buff "
+            .. "whose remaining time this client won't report is never flagged.", expiring)
     local warnSlider = Slider("Warn under (minutes)", 18, -76, 1, 30, 1,
         function() return ns.db.expiringMinutes end,
         function(v) ns.db.expiringMinutes = v end, nil, expiring)
+    local expireDD = Dropdown("UnbuffedExpireDrop", "Show them as", 268, -72, 190, EXPIRE_CHOICES, "expireStyle", expiring)
+    local fadeSlider = Slider("Faded opacity", 18, -134, 10, 100, 5,
+        function() return ns.db.expireAlpha end, function(v) ns.db.expireAlpha = v end,
+        function(v) return v .. "%" end, expiring)
 
     ----------------------------------------------------------------------
     -- General
@@ -524,9 +550,14 @@ local function buildPanel()
             if a.key == ns.db.anchor then anchorHelp:SetText(a.help) end
         end
         -- A greyed-out control still shows its value; it just stops taking input.
+        local function dim(widget, enabled)
+            widget:SetAlpha(enabled and 1 or 0.4)
+            widget:EnableMouse(enabled and true or false)
+        end
         local on = ns.db.flagExpiring
-        warnSlider:SetAlpha(on and 1 or 0.4)
-        warnSlider:EnableMouse(on and true or false)
+        dim(warnSlider, on)
+        dim(expireDD, on)
+        dim(fadeSlider, on and ns.db.expireStyle == "FADE")   -- only meaningful when fading
         layoutBlocks()
         updatePreview()
     end
@@ -606,10 +637,6 @@ SlashCmdList.UNBUFFED = function(msg)
 
     if cmd == "" then
         ns.OpenOptions()
-    elseif cmd == "on" or cmd == "off" then
-        ns.db.enabled = (cmd == "on")
-        ns.RefreshAll()
-        ns.Print(ns.db.enabled and "on." or "off.")
     elseif cmd == "add" then
         local entry, err = ns.EntryFromInput(rest)
         if not entry then ns.Print(err); return end
@@ -635,6 +662,6 @@ SlashCmdList.UNBUFFED = function(msg)
                 .. "  |cff888888[" .. table.concat(e.names, " / ") .. "]|r")
         end
     else
-        ns.Print("/ub  |cff888888(settings)|r  ·  add <name|id>  ·  remove <name>  ·  list  ·  on|off")
+        ns.Print("/ub  |cff888888(settings)|r  ·  add <name|id>  ·  remove <name>  ·  list")
     end
 end

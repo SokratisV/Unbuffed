@@ -18,7 +18,7 @@ buffed player shows nothing at all, so every icon you can see is something to ca
 
 - `/unbuffed` (or `/ub`) opens the settings panel. Tick the buffs to flag.
 - `/ub add <name or spell ID>` adds anything not in the preset list.
-- `/ub remove <name>`, `/ub list`, `/ub on`, `/ub off`.
+- `/ub remove <name>`, `/ub list`.
 
 Presets cover the long-term raid buffs: Fortitude, Arcane Intellect, Mark of the Wild,
 Divine Spirit, Thorns, Battle Shout, and Blessings of Might / Wisdom / Kings.
@@ -68,9 +68,16 @@ with its offsets unchanged.
 ## Buffs about to expire
 
 With **Also flag buffs about to expire** on, a buff that has less than the warning
-threshold left (5 minutes by default) is shown too -- the same icon, tinted amber with
-the minutes remaining on it, so it reads differently from a buff that was never cast at
-all. A buff whose remaining time this client will not report is never flagged, for the
+threshold left (5 minutes by default) is shown too, with the minutes remaining on it, so
+it reads differently from a buff that was never cast at all. **Show them as** picks how:
+
+- **Amber tint** (the default): the icon turns amber.
+- **Faded icon**: the icon keeps its colour and becomes more transparent instead, by
+  the **Faded opacity** you set (50% by default).
+
+Only the icon fades: the minutes-left label stays fully opaque, so it is always
+readable. The preview in the Position section includes an expiring example, so you can
+see the effect as you change it. A buff whose remaining time this client will not report is never flagged, for the
 same reason an unreadable buff is never drawn as missing.
 
 ## Why buffs are matched by name

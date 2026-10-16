@@ -114,6 +114,19 @@ end
 -- full-colour icon that means "not buffed at all".
 local EXPIRING_TINT = { 1.0, 0.72, 0.15 }
 
+-- What an about-to-expire icon looks like: its vertex colour and a multiplier for its
+-- opacity. TINT recolours it amber at full opacity; FADE leaves the colour alone and
+-- lowers the opacity instead. Shared with the options preview. The label that says how
+-- many minutes are left is not part of this -- it is deliberately left untouched.
+function ns.ExpiringLook(db)
+    if db.expireStyle == "FADE" then
+        -- clamped, so a bad saved value can neither hide the icon nor exceed full opacity
+        local pct = math.min(100, math.max(10, tonumber(db.expireAlpha) or ns.defaults.expireAlpha))
+        return 1, 1, 1, pct / 100
+    end
+    return EXPIRING_TINT[1], EXPIRING_TINT[2], EXPIRING_TINT[3], 1
+end
+
 local function getIcon(row, i)
     local t = row.icons[i]
     if t then return t, row.labels[i] end
@@ -175,7 +188,6 @@ end
 local function updatePlate(unit, plate)
     if not plate then return end
     local db = ns.db
-    if not db or not db.enabled then hideRow(plate); return end
 
     -- Unit identity can be restricted too, and then UnitIsPlayer answers nothing
     -- rather than false. Only a real boolean counts: an unknown unit is not a
@@ -208,18 +220,26 @@ local function updatePlate(unit, plate)
                 local t, fs = getIcon(row, shown)
                 t:SetTexture(entry.icon or ns.FALLBACK_ICON)
                 t:SetSize(size, size)
-                t:SetAlpha(db.alpha)
                 t:ClearAllPoints()
                 t:SetPoint("LEFT", row, "LEFT", (shown - 1) * (size + spacing), 0)
-                ns.StyleIcon(t, db.iconStyle, db.alpha, db.iconZoom)
+                -- The icon's own look: the opacity setting, and for one about to expire
+                -- whatever ns.ExpiringLook says on top of it. The icon and its ring both
+                -- take this opacity, so they fade together.
+                local alpha, r, g, b = db.alpha, 1, 1, 1
                 if expiring then
-                    t:SetVertexColor(EXPIRING_TINT[1], EXPIRING_TINT[2], EXPIRING_TINT[3])
+                    local er, eg, eb, ea = ns.ExpiringLook(db)
+                    r, g, b, alpha = er, eg, eb, db.alpha * ea
+                end
+                t:SetAlpha(alpha)
+                t:SetVertexColor(r, g, b)
+                ns.StyleIcon(t, db.iconStyle, alpha, db.iconZoom)
+                if expiring then
                     fs:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",
                         math.max(7, math.floor(size * 0.46)), "OUTLINE")
                     fs:SetText(minsLeft .. "m")
+                    fs:SetAlpha(1)   -- only the icon fades, never the timer beside it
                     fs:Show()
                 else
-                    t:SetVertexColor(1, 1, 1)
                     fs:Hide()
                 end
                 t:Show()
@@ -280,7 +300,6 @@ ns.On("PLAYER_ENTERING_WORLD", function() ns.RefreshAll() end)
 local ticker = CreateFrame("Frame")
 local since = 0
 ticker:SetScript("OnUpdate", function(_, dt)
-    if not ns.db or not ns.db.enabled then return end
     since = since + dt
     if since < (ns.db.refresh or 0.5) then return end
     since = 0

@@ -97,7 +97,6 @@ ns.FALLBACK_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 -- Saved variables
 --------------------------------------------------------------------------
 ns.defaults = {
-    enabled   = true,
     -- Stays empty here on purpose. The starting buffs are seeded by key, once, on a
     -- brand-new profile (see seedTracked): copyDefaults merges tables by index, so a
     -- default entry sitting at tracked[1] would be folded field-by-field into
@@ -117,6 +116,8 @@ ns.defaults = {
     hideSelf  = true,   -- your own nameplate (the personal resource display)
     flagExpiring    = true,  -- also flag buffs that are about to run out
     expiringMinutes = 5,     -- ...with this much left or less
+    expireStyle = "TINT",    -- how such an icon differs: a key in ns.EXPIRE_STYLES
+    expireAlpha = 50,        -- FADE only: percent opacity (of the icon opacity setting)
     refresh   = 0.5,    -- seconds between re-checks of every visible plate
     greeted   = false,
 }
@@ -127,6 +128,13 @@ ns.ICON_STYLES = {
     { key = "SQUARE", label = "Square" },
     { key = "ROUND",  label = "Round" },
     { key = "RING",   label = "Gold ring" },
+}
+
+-- How an icon about to expire is told apart from one that was never cast. Only the
+-- icon changes; the minutes-left label beside it always stays fully opaque.
+ns.EXPIRE_STYLES = {
+    { key = "TINT", label = "Amber tint" },
+    { key = "FADE", label = "Faded icon" },
 }
 
 -- The anchor choices, in the order the panel lists them. `help` is the line the panel
