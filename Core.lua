@@ -61,35 +61,7 @@ end)
 --------------------------------------------------------------------------
 -- Presets
 --------------------------------------------------------------------------
--- Matched by NAME, not spell id, and that is deliberate: on Vanilla-era content a
--- buff is a family of per-rank spell ids (Power Word: Fortitude alone is 1243,
--- 1244, 1245, 2791, 10937, 10938), so one id would only ever match one rank.
--- `names` also carries the group version, because someone under Prayer of
--- Fortitude is not missing Fortitude.
---
--- Icons are literal paths so a preset still draws for a class that can't cast it
--- (a warrior wants to see who lacks Fortitude); a spell id look-up would come back
--- empty there.
-ns.PRESETS = {
-    { key = "fortitude", label = "Fortitude",          icon = "Interface\\Icons\\Spell_Holy_WordFortitude",
-      names = { "Power Word: Fortitude", "Prayer of Fortitude" } },
-    { key = "intellect", label = "Arcane Intellect",   icon = "Interface\\Icons\\Spell_Holy_MagicalSentry",
-      names = { "Arcane Intellect", "Arcane Brilliance" } },
-    { key = "motw",      label = "Mark of the Wild",   icon = "Interface\\Icons\\Spell_Nature_Regeneration",
-      names = { "Mark of the Wild", "Gift of the Wild" } },
-    { key = "spirit",    label = "Divine Spirit",      icon = "Interface\\Icons\\Spell_Holy_DivineSpirit",
-      names = { "Divine Spirit", "Prayer of Spirit" } },
-    { key = "thorns",    label = "Thorns",             icon = "Interface\\Icons\\Spell_Nature_Thorns",
-      names = { "Thorns" } },
-    { key = "bshout",    label = "Battle Shout",       icon = "Interface\\Icons\\Ability_Warrior_BattleShout",
-      names = { "Battle Shout" } },
-    { key = "might",     label = "Blessing of Might",  icon = "Interface\\Icons\\Spell_Holy_FistOfJustice",
-      names = { "Blessing of Might", "Greater Blessing of Might" } },
-    { key = "wisdom",    label = "Blessing of Wisdom", icon = "Interface\\Icons\\Spell_Holy_SealOfWisdom",
-      names = { "Blessing of Wisdom", "Greater Blessing of Wisdom" } },
-    { key = "kings",     label = "Blessing of Kings",  icon = "Interface\\Icons\\Spell_Magic_MageArmor",
-      names = { "Blessing of Kings", "Greater Blessing of Kings" } },
-}
+-- The buffs on offer, by class, live in Buffs.lua.
 
 ns.FALLBACK_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 
@@ -262,15 +234,8 @@ end
 -- Fortitude back, and an existing profile is never changed under its owner.
 local function seedTracked()
     for _, key in ipairs(ns.SEED_PRESETS) do
-        for _, preset in ipairs(ns.PRESETS) do
-            if preset.key == key then
-                ns.AddTracked({
-                    key = preset.key, label = preset.label, icon = preset.icon,
-                    names = { unpack(preset.names) },
-                })
-                break
-            end
-        end
+        local preset = ns.FindPreset(key)
+        if preset then ns.AddTracked(ns.PresetEntry(preset)) end
     end
 end
 

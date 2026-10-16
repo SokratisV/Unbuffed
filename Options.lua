@@ -4,7 +4,6 @@ local panel = CreateFrame("Frame")
 panel.name = "Unbuffed"
 local category          -- modern Settings category, when the client has one
 local refreshers = {}   -- run on every panel show, to resync widgets with the db
-local rebuildCustomList -- forward decl
 local content           -- the scroll child; every widget below lives in it
 local blocks = {}       -- the panel's sections, top to bottom
 local syncDependents    -- forward decl: re-reads the db into everything that hangs off it
@@ -109,9 +108,15 @@ local STYLE_CHOICES  = Choices(ns.ICON_STYLES, ns.IconStyleSupported)
 local EXPIRE_CHOICES = Choices(ns.EXPIRE_STYLES)
 
 -- `key` is the db field the dropdown edits. `name` is only for the legacy branch,
--- whose frames need a unique global name.
-local function Dropdown(name, label, x, y, width, choices, key, parent)
+-- whose frames need a unique global name. `default` is what it shows while the field
+-- has no saved value (the class dropdown starts on your own class, for instance).
+local function Dropdown(name, label, x, y, width, choices, key, parent, default)
     local p = parent or content
+    local function current()
+        local v = ns.db[key]
+        if v == nil then return default end
+        return v
+    end
     local fs = p:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     fs:SetPoint("TOPLEFT", x, y)
     fs:SetText(label)
@@ -121,7 +126,7 @@ local function Dropdown(name, label, x, y, width, choices, key, parent)
         dd:SetPoint("TOPLEFT", x, y - 18)
         dd:SetWidth(width)
         MenuUtil.CreateRadioMenu(dd,
-            function(value) return value == ns.db[key] end,
+            function(value) return value == current() end,
             function(value)
                 if ns.PanelRefreshing() then return end   -- resync, not a user edit
                 ns.db[key] = value; onChange()
@@ -136,13 +141,13 @@ local function Dropdown(name, label, x, y, width, choices, key, parent)
     UIDropDownMenu_SetWidth(dd, width - 20)
     local function setText()
         for _, o in ipairs(choices) do
-            if o[2] == ns.db[key] then UIDropDownMenu_SetText(dd, o[1]); return end
+            if o[2] == current() then UIDropDownMenu_SetText(dd, o[1]); return end
         end
     end
     UIDropDownMenu_Initialize(dd, function(_, level)
         for _, o in ipairs(choices) do
             local info = UIDropDownMenu_CreateInfo()
-            info.text, info.checked = o[1], (o[2] == ns.db[key])
+            info.text, info.checked = o[1], (o[2] == current())
             info.func = function() ns.db[key] = o[2]; setText(); CloseDropDownMenus(); onChange() end
             UIDropDownMenu_AddButton(info, level)
         end
@@ -226,47 +231,133 @@ local function buildPanel()
     ----------------------------------------------------------------------
     -- Tracking
     ----------------------------------------------------------------------
-    local track = Section(222)
+    -- Pick a class, tick the buffs it offers. Choices accumulate across classes, and the
+    -- Active list underneath shows everything currently tracked, whichever class it came
+    -- from -- or none, for a buff added by name. All of it is laid out by renderTracking,
+    -- because the grid's height depends on the class and the active list's on how many
+    -- buffs are tracked; the section just grows and everything below slides.
+    local track = Section(300)
     Header("Buffs to flag", 16, 0, track)
 
-    -- Presets, three columns: nine of them in five rows wasted enough height
-    -- to push the controls below off the bottom of the panel.
-    local PRESET_COLS = 3
-    for i, preset in ipairs(ns.PRESETS) do
-        local col = (i - 1) % PRESET_COLS
-        local row = math.floor((i - 1) / PRESET_COLS)
-        Check(preset.label, 18 + col * 174, -28 - row * 26,
-            function()
-                local e = ns.FindTracked(preset.key)
-                return e and e.enabled
-            end,
-            function(on)
-                if on then
-                    ns.AddTracked({
-                        key = preset.key, label = preset.label, icon = preset.icon,
-                        names = { unpack(preset.names) },
-                    })
-                else
-                    ns.RemoveTracked(preset.key)
-                end
-                if rebuildCustomList then rebuildCustomList() end
-            end,
-            "Matched by name, so every rank counts -- and so do the group versions ("
-                .. table.concat(preset.names, ", ") .. ").", track)
+    local classList = ns.ClassList()
+    local defaultClass = ns.PlayerClass() or classList[1].key   -- start on your own class
+    local function currentClass() return ns.db.browseClass or defaultClass end
+    local function className(key)
+        for _, c in ipairs(classList) do if c.key == key then return c.name end end
+        return key
+    end
+    Dropdown("UnbuffedClassDrop", "Class", 18, -28, 230, Choices(classList), "browseClass", track, defaultClass)
+
+    local GRID_COLS, GRID_X, GRID_W, ROW_H = 3, 18, 174, 26
+    local GRID_TOP = 82       -- where the class's buffs start, below the section's top
+    local CHIP_H = 24
+
+    -- The class's buffs: a pool of ticks, reused as the class changes.
+    local gridPool = {}
+    local function gridWidget(i)
+        local w = gridPool[i]
+        if w then return w end
+        w = CreateFrame("CheckButton", nil, track, "UICheckButtonTemplate")
+        w:SetSize(24, 24)
+        w.icon = w:CreateTexture(nil, "ARTWORK")
+        w.icon:SetSize(16, 16)
+        w.icon:SetPoint("LEFT", w, "RIGHT", 2, 0)
+        w.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+        w.text = w:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+        w.text:SetPoint("LEFT", w.icon, "RIGHT", 4, 0)
+        w.text:SetWidth(GRID_W - 74)
+        w.text:SetJustifyH("LEFT")
+        w.text:SetWordWrap(false)
+        w:SetScript("OnClick", function(self)
+            local preset = self.preset
+            if self:GetChecked() then ns.AddTracked(ns.PresetEntry(preset)) else ns.RemoveTracked(preset.key) end
+            onChange()
+        end)
+        w:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Matched by name, so every rank counts -- and so do the group versions ("
+                .. table.concat(self.preset.names, ", ") .. ").", nil, nil, nil, nil, true)
+            GameTooltip:Show()
+        end)
+        w:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        gridPool[i] = w
+        return w
     end
 
-    local presetRows = math.ceil(#ns.PRESETS / PRESET_COLS)
-    local customY = -28 - presetRows * 26 - 12
+    local gridEmpty = track:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    gridEmpty:SetWidth(500)
+    gridEmpty:SetJustifyH("LEFT")
 
-    Header("Add another buff", 16, customY, track)
+    -- Returns the height the grid takes.
+    local function renderGrid()
+        local classKey = currentClass()
+        local list = ns.ClassBuffs(classKey)
+        for i, preset in ipairs(list) do
+            local w = gridWidget(i)
+            w.preset = preset
+            w.icon:SetTexture(ns.PresetIcon(preset))
+            w.text:SetText(preset.label)
+            local e = ns.FindTracked(preset.key)
+            w:SetChecked(e and e.enabled and true or false)
+            local col, row = (i - 1) % GRID_COLS, math.floor((i - 1) / GRID_COLS)
+            w:ClearAllPoints()
+            w:SetPoint("TOPLEFT", track, "TOPLEFT", GRID_X + col * GRID_W, -(GRID_TOP + row * ROW_H))
+            w:Show()
+        end
+        for i = #list + 1, #gridPool do gridPool[i]:Hide() end
+        if #list == 0 then
+            gridEmpty:SetText(className(classKey) .. " has no buffs worth flagging on other players. "
+                .. "Anything else can still be added by name below.")
+            gridEmpty:ClearAllPoints()
+            gridEmpty:SetPoint("TOPLEFT", track, "TOPLEFT", 22, -GRID_TOP)
+            gridEmpty:Show()
+            return 22
+        end
+        gridEmpty:Hide()
+        return math.ceil(#list / GRID_COLS) * ROW_H
+    end
+
+    -- Everything being tracked, from any class, each with a button to drop it.
+    local activeHeader = Header("Active buffs", 16, 0, track)
+    local activeEmpty = track:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    activeEmpty:SetText("Nothing is being tracked yet. Pick a class above and tick the buffs you want flagged.")
+
+    local chipPool = {}
+    local function chipFrame(i)
+        local c = chipPool[i]
+        if c then return c end
+        c = CreateFrame("Frame", nil, track)
+        c:SetSize(GRID_W - 6, 22)
+        c.icon = c:CreateTexture(nil, "ARTWORK")
+        c.icon:SetSize(16, 16)
+        c.icon:SetPoint("LEFT", 0, 0)
+        c.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+        c.text = c:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+        c.text:SetPoint("LEFT", c.icon, "RIGHT", 5, 0)
+        c.text:SetWidth(GRID_W - 6 - 16 - 5 - 24)
+        c.text:SetJustifyH("LEFT")
+        c.text:SetWordWrap(false)
+        c.del = CreateFrame("Button", nil, c)
+        c.del:SetSize(16, 16)
+        c.del:SetPoint("RIGHT", 0, 0)
+        c.del:SetNormalTexture("Interface\\Buttons\\UI-StopButton")
+        c.del:GetNormalTexture():SetVertexColor(0.9, 0.4, 0.4)
+        c.del:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+        c.del:SetScript("OnClick", function()
+            if c.entry then ns.RemoveTracked(c.entry.key); onChange() end
+        end)
+        chipPool[i] = c
+        return c
+    end
+
+    -- Adding by name or spell id, for anything the classes above do not list.
+    local addHeader = Header("Add another buff", 16, 0, track)
 
     local addBox = CreateFrame("EditBox", nil, track, "InputBoxTemplate")
     addBox:SetSize(200, 22)
-    addBox:SetPoint("TOPLEFT", 22, customY - 30)
     addBox:SetAutoFocus(false)
 
     local addHint = track:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-    addHint:SetPoint("TOPLEFT", 22, customY - 56)
     addHint:SetText("Buff name or spell ID. A name matches every rank; an ID also survives combat.")
 
     local addBtn = CreateFrame("Button", nil, track, "UIPanelButtonTemplate")
@@ -282,68 +373,49 @@ local function buildPanel()
         ns.AddTracked(entry)
         addBox:SetText("")
         addBox:ClearFocus()
-        if rebuildCustomList then rebuildCustomList() end
-        ns.RefreshAll()
+        onChange()
         ns.Print("now flagging |cffffd100" .. entry.label .. "|r.")
     end
     addBtn:SetScript("OnClick", doAdd)
     addBox:SetScript("OnEnterPressed", doAdd)
     addBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 
-    -- Custom (non-preset) entries, each with a remove button.
-    local customRows = {}
-    local customListY = customY - 80
-    local LIST_TOP = -customListY   -- distance from the section's top to the first row
+    -- Lay the whole section out from the current class and the current tracked list.
+    local function renderTracking()
+        local y = GRID_TOP + renderGrid() + 14
 
-    local emptyFS = track:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-    emptyFS:SetPoint("TOPLEFT", 22, customListY)
-    emptyFS:SetText("No custom buffs added.")
-
-    local PRESET_KEYS = {}
-    for _, p in ipairs(ns.PRESETS) do PRESET_KEYS[p.key] = true end
-
-    rebuildCustomList = function()
-        for _, r in ipairs(customRows) do r:Hide() end
-        local shown = 0
-        for _, e in ipairs(ns.db.tracked) do
-            if not PRESET_KEYS[e.key] then
-                shown = shown + 1
-                local r = customRows[shown]
-                if not r then
-                    r = CreateFrame("Frame", nil, track)
-                    r:SetSize(400, 20)
-                    r.icon = r:CreateTexture(nil, "ARTWORK")
-                    r.icon:SetSize(16, 16)
-                    r.icon:SetPoint("LEFT", 0, 0)
-                    r.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-                    r.label = r:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-                    r.label:SetPoint("LEFT", r.icon, "RIGHT", 6, 0)
-                    r.del = CreateFrame("Button", nil, r)
-                    r.del:SetSize(16, 16)
-                    r.del:SetPoint("LEFT", 300, 0)
-                    r.del:SetNormalTexture("Interface\\Buttons\\UI-StopButton")
-                    r.del:GetNormalTexture():SetVertexColor(0.9, 0.4, 0.4)
-                    r.del:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
-                    customRows[shown] = r
-                end
-                r:SetPoint("TOPLEFT", 22, customListY - (shown - 1) * 20)
-                r.icon:SetTexture(e.icon or ns.FALLBACK_ICON)
-                r.label:SetText(e.label)
-                r.del:SetScript("OnClick", function()
-                    ns.RemoveTracked(e.key)
-                    rebuildCustomList()
-                    ns.RefreshAll()
-                end)
-                r:Show()
-            end
+        local n = #ns.db.tracked
+        activeHeader:SetText("Active buffs (" .. n .. ")")
+        activeHeader:ClearAllPoints()
+        activeHeader:SetPoint("TOPLEFT", track, "TOPLEFT", 16, -y)
+        y = y + 26
+        for i, e in ipairs(ns.db.tracked) do
+            local c = chipFrame(i)
+            c.entry = e
+            c.icon:SetTexture(e.icon or ns.FALLBACK_ICON)
+            c.text:SetText(e.label or e.key)
+            c:SetAlpha(e.enabled == false and 0.5 or 1)
+            local col, row = (i - 1) % GRID_COLS, math.floor((i - 1) / GRID_COLS)
+            c:ClearAllPoints()
+            c:SetPoint("TOPLEFT", track, "TOPLEFT", GRID_X + col * GRID_W, -(y + row * CHIP_H))
+            c:Show()
         end
-        emptyFS:SetShown(shown == 0)
-        -- The section is as tall as its list, so everything below follows it.
-        track.h = LIST_TOP + math.max(shown, 1) * 20 + 8
+        for i = n + 1, #chipPool do chipPool[i]:Hide() end
+        activeEmpty:ClearAllPoints()
+        activeEmpty:SetPoint("TOPLEFT", track, "TOPLEFT", 22, -y)
+        activeEmpty:SetShown(n == 0)
+        y = y + math.max(1, math.ceil(n / GRID_COLS)) * CHIP_H + 12
+
+        addHeader:ClearAllPoints()
+        addHeader:SetPoint("TOPLEFT", track, "TOPLEFT", 16, -y)
+        addBox:ClearAllPoints()
+        addBox:SetPoint("TOPLEFT", track, "TOPLEFT", 22, -(y + 30))
+        addHint:ClearAllPoints()
+        addHint:SetPoint("TOPLEFT", track, "TOPLEFT", 22, -(y + 56))
+
+        track.h = y + 56 + 18
         track:SetHeight(track.h)
-        layoutBlocks()
     end
-    refreshers[#refreshers + 1] = function() rebuildCustomList() end
 
     ----------------------------------------------------------------------
     -- Position
@@ -408,9 +480,9 @@ local function buildPanel()
     local pvRow = CreateFrame("Frame", nil, pv)
     pvRow:SetFrameLevel(pv:GetFrameLevel() + 6)
     pvRow.icons = {}
-    for i, preset in ipairs({ ns.PRESETS[1], ns.PRESETS[3], ns.PRESETS[2] }) do
+    for i, key in ipairs({ "fortitude", "motw", "intellect" }) do
         local t = ns.NewIcon(pvRow)
-        t:SetTexture(preset.icon)
+        t:SetTexture(ns.PresetIcon(ns.FindPreset(key)))
         pvRow.icons[i] = t
     end
     -- A font template, not just a layer: a FontString with no font raises "Font not set" the
@@ -548,6 +620,7 @@ local function buildPanel()
     ----------------------------------------------------------------------
     -- Called after every change and every resync. Nothing here writes to the db.
     syncDependents = function()
+        renderTracking()
         for _, a in ipairs(ns.ANCHORS) do
             if a.key == ns.db.anchor then anchorHelp:SetText(a.help) end
         end

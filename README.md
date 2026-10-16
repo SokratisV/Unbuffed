@@ -16,15 +16,29 @@ buffed player shows nothing at all, so every icon you can see is something to ca
 
 ## Using it
 
-- `/unbuffed` (or `/ub`) opens the settings panel. Tick the buffs to flag.
-- `/ub add <name or spell ID>` adds anything not in the preset list.
+- `/unbuffed` (or `/ub`) opens the settings panel. Pick a class and tick the buffs to flag.
+- `/ub add <name or spell ID>` adds anything the class lists don't have.
 - `/ub remove <name>`, `/ub list`.
 
-Presets cover the long-term raid buffs: Fortitude, Arcane Intellect, Mark of the Wild,
-Divine Spirit, Thorns, Battle Shout, and Blessings of Might / Wisdom / Kings.
-**Fortitude is tracked out of the box**, so the addon does something visible before
-you open the panel; untick it like any other preset if you don't want it. It is
-seeded once per profile, not re-added on every load.
+## Choosing buffs
+
+The **Buffs to flag** section has a **Class** dropdown with all nine classes. Pick one
+and it lists every buff that class casts on other players: for example the Paladin's
+blessings and auras, the Shaman's totem buffs, the Priest's Fortitude, Spirit and Shadow
+Protection. The dropdown starts on your own class. Tick any number of buffs, and switch
+class to add more: the choices accumulate.
+
+Under the class list, **Active buffs** shows everything currently tracked, whichever
+class it came from (or none, for a buff added by name), each with a button to drop it.
+Unticking a buff in its class does the same.
+
+A Rogue has no buffs of that kind, so that class's list is empty; anything else can
+always be added by name or spell ID. A few buffs exist only on the TBC clients
+(Commanding Shout, Tranquil Air, Wrath of Air Totem) and are left out on Forever.
+
+**Fortitude is tracked out of the box** on a fresh profile, so the addon does something
+visible before you open the panel; untick it like any other buff if you don't want it.
+It is seeded once per profile, not re-added on every load.
 
 ## Where the icons go
 
@@ -82,12 +96,12 @@ same reason an unreadable buff is never drawn as missing.
 
 ## Why buffs are matched by name
 
-A preset matches on the buff's **name**, not a spell ID, and that is deliberate. On
+Every listed buff matches on its **name**, not a spell ID, and that is deliberate. On
 Vanilla-era content a buff is a *family* of per-rank spell IDs — Power Word: Fortitude
 alone is 1243, 1244, 1245, 2791, 10937 and 10938 — so a single ID would only ever match
 one rank and would report everyone else as unbuffed.
 
-Names also let a preset carry the group version, because somebody under **Prayer of
+Names also let an entry carry the group version, because somebody under **Prayer of
 Fortitude** is not missing Fortitude.
 
 Adding a buff by spell ID stores the ID *and* its name. The ID is the form that keeps
