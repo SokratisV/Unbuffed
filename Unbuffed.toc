@@ -4,7 +4,7 @@
 ## Author: Sokratis
 ## Version: 1.4.0
 ## SavedVariables: UnbuffedDB
-## IconTexture: Interface\Icons\Spell_Holy_WordFortitude
+## IconTexture: Interface\AddOns\Unbuffed\Media\Icon
 ## X-License: MIT
 ## X-Curse-Project-ID: 1735472
 
