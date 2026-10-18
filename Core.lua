@@ -86,6 +86,7 @@ ns.defaults = {
     yOffset   = 0,
     alpha     = 1,
     hideSelf  = true,   -- your own nameplate (the personal resource display)
+    groupOnly = false,  -- only flag players who are in your party or raid
     flagExpiring    = true,  -- also flag buffs that are about to run out
     expiringMinutes = 5,     -- ...with this much left or less
     expireStyle = "TINT",    -- how such an icon differs: a key in ns.EXPIRE_STYLES

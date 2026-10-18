@@ -185,6 +185,17 @@ local function hideRow(plate)
     if row then row:Hide() end
 end
 
+-- Whether the client says this unit is in your party or raid: true or false, or nil when it
+-- will not say. A secret answer is treated as no answer, as everywhere else here, because
+-- guessing would show an icon on a stranger or hide one on a friend. UnitInRaid gives the
+-- raid index (0 is a real member, and 0 is truthy in Lua) or nil, while UnitInParty gives a
+-- boolean on newer clients and 1 or nil on older ones; either way, truthiness is the test.
+local function inYourGroup(unit)
+    local party, raid = UnitInParty(unit), UnitInRaid(unit)
+    if ns.IsSecret(party) or ns.IsSecret(raid) then return nil end
+    return (party and true or false) or raid ~= nil
+end
+
 local function updatePlate(unit, plate)
     if not plate then return end
     local db = ns.db
@@ -195,6 +206,8 @@ local function updatePlate(unit, plate)
     if ns.Truth(UnitIsPlayer(unit)) ~= true then hideRow(plate); return end
     if ns.Truth(UnitIsFriend("player", unit)) ~= true then hideRow(plate); return end
     if db.hideSelf and ns.Truth(UnitIsUnit(unit, "player")) == true then hideRow(plate); return end
+    -- Only a definite yes counts: a client that will not say is not "in your group".
+    if db.groupOnly and inYourGroup(unit) ~= true then hideRow(plate); return end
 
     local row = getRow(plate)
     local size, spacing = db.iconSize, db.spacing

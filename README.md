@@ -51,6 +51,15 @@ always be added by name or spell ID. A few buffs exist only on the TBC clients
 visible before you open the panel; untick it like any other buff if you don't want it.
 It is seeded once per profile, not re-added on every load.
 
+## Who gets an icon
+
+Any friendly player whose nameplate is on screen. Two options in **General** narrow that:
+**Skip my own nameplate**, and **Only show for party and raid members**, which limits the
+icons to people in your group, so strangers in a city or a dungeon never get one. With the
+second on and no group, nothing is shown. If the client won't say whether someone is in your
+group, they are treated as not being in it, the same way an unreadable buff is never drawn
+as missing.
+
 ## Where the icons go
 
 The **Position** section of the settings panel has a live preview of a nameplate, so

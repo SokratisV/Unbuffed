@@ -253,20 +253,6 @@ local function buildPanel()
     scroll:SetScrollChild(content)
 
     ----------------------------------------------------------------------
-    -- Title
-    ----------------------------------------------------------------------
-    local head = Section(70)
-    local title = head:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 16, -12)
-    title:SetText("Unbuffed")
-
-    local blurb = head:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    blurb:SetPoint("TOPLEFT", 16, -36)
-    blurb:SetWidth(520)
-    blurb:SetJustifyH("LEFT")
-    blurb:SetText("Shows a small icon beside a friendly player's nameplate for each tracked buff they are |cffffd100missing|r. A fully buffed player shows nothing.")
-
-    ----------------------------------------------------------------------
     -- Tracking
     ----------------------------------------------------------------------
     -- Pick a class, tick the buffs it offers. Choices accumulate across classes, and the
@@ -629,17 +615,21 @@ local function buildPanel()
     ----------------------------------------------------------------------
     -- General
     ----------------------------------------------------------------------
-    local general = Section(96)
+    local general = Section(124)
     Header("General", 16, 0, general)
     Check("Skip my own nameplate", 18, -28,
         function() return ns.db.hideSelf end, function(v) ns.db.hideSelf = v end,
         "Leaves the personal resource display alone.", general)
+    Check("Only show for party and raid members", 18, -54,
+        function() return ns.db.groupOnly end, function(v) ns.db.groupOnly = v end,
+        "Skips everyone who is not in your party or raid, so strangers' plates never get an icon. "
+            .. "With this on and no group, nothing is shown. Your own plate is covered by the option above.", general)
     -- Two clicks rather than a popup: a StaticPopup shown from addon code can hang the
     -- client in Gamepad mode, and this needs no dialog of its own. The first click arms
     -- the button and says so; it disarms itself if the second never comes.
     local RESET_LABEL = "Reset position and look"
     local resetBtn, armed
-    resetBtn = Button(RESET_LABEL, 18, -62, 190, function()
+    resetBtn = Button(RESET_LABEL, 18, -90, 190, function()
         armed = (armed or 0) + 1
         local mine = armed
         if resetBtn.confirming then
