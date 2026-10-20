@@ -172,6 +172,11 @@ local function available(entry)
     return not (entry.tbc and ns.IsForever)
 end
 
+-- Whether this client has a listed buff (a TBC-only one is left out on Forever).
+function ns.PresetAvailable(preset)
+    return available(preset)
+end
+
 -- The buffs a class offers on this client, in the order they are written above.
 function ns.ClassBuffs(classToken)
     local out = {}

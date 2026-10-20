@@ -97,6 +97,7 @@ ns.defaults = {
     outline   = false,       -- SQUARE and ROUND styles: a black edge round the icon
     outlineSize = 1,         -- ...this many pixels thick (1 to 4)
     optionsPage = "buffs",   -- the page the settings window was last on
+    shareReceive = true,     -- let other players offer you their buff list (you still get asked)
     refresh   = 0.5,    -- seconds between re-checks of every visible plate
     greeted   = false,
 }

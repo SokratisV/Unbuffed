@@ -17,13 +17,14 @@ buffed player shows nothing at all, so every icon you can see is something to ca
 ## Using it
 
 - `/unbuffed` (or `/ub`) opens the settings window. Pick a class and tick the buffs to flag. It has
-  four pages -- **Buffs**, **Look**, **Expiring** and **General** -- in the style of FlareUI: the
+  five pages -- **Buffs**, **Look**, **Expiring**, **Share** and **General** -- in the style of FlareUI: the
   pages on the left, the settings in the middle, and on the right what the setting you are pointing
   at does. Settings that don't apply to your choices (the ring color, once the style has no ring)
   are not shown. The entry under AddOns in the game's own settings just opens this window.
 - `/ub add <name or spell ID>` adds anything the class lists don't have.
 - `/ub remove <name>`, `/ub list`.
 - `/ub test` runs the expiring-buff look for 20 seconds, so you can see it.
+- `/ub share [name]` sends your buff list to another player, or opens the Share page.
 
 ## Choosing buffs
 
@@ -55,6 +56,20 @@ always be added by name or spell ID. A few buffs exist only on the TBC clients
 **Fortitude is tracked out of the box** on a fresh profile, so the addon does something
 visible before you open the panel; untick it like any other buff if you don't want it.
 It is seeded once per profile, not re-added on every load.
+
+## Sharing your buffs
+
+The **Share** page (or `/ub share <name>`) sends your list of tracked buffs to another player who has
+Unbuffed, over a whisper: type their name, or press **Target** to take the player you are targeting,
+then **Send**. They are asked first, with an Accept / Decline prompt of Unbuffed's own, and nothing
+arrives unless they accept. Only the buffs you track go across, not your look, and only buffs they
+don't already track are added: nothing of theirs is removed, changed, or switched on.
+
+A listed buff is sent as its key and looked up on the other side, so it comes with the receiver's own
+names and icon, and one that doesn't exist on their client (a TBC-only buff on WoW Forever) is skipped
+and reported. A buff you added by name or spell ID is sent as that name or ID. Anything that arrives is
+checked and size-capped. **Let other players offer me their buffs** on the same page turns offers off
+(they are declined for you). Transfers go in small paced messages, the same way Thumber shares its marks.
 
 ## Who gets an icon
 

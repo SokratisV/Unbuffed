@@ -12,4 +12,5 @@ Core.lua
 Buffs.lua
 Auras.lua
 Nameplates.lua
+Share.lua
 Options.lua

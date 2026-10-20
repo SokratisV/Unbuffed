@@ -718,6 +718,50 @@ local function BuildAddBox(parent)
     return add, function() return 56 end
 end
 
+-- Sending your buff list to another player: a name, a button to take the one you are targeting, a
+-- button to send, and the line saying how it is going (see Share.lua).
+local function BuildShareRow(parent)
+    local row = CreateFrame("Frame", nil, parent)
+    local box = CreateFrame("EditBox", nil, row, "InputBoxTemplate")
+    box:SetSize(190, 22)
+    box:SetPoint("TOPLEFT", 12, -6)
+    box:SetAutoFocus(false)
+    if ChatFontNormal then box:SetFontObject(ChatFontNormal) end
+    box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    local status = Text(row, "GameFontHighlightSmall")
+    status:SetPoint("TOPLEFT", 12, -38)
+    status:SetWidth(CONTENT_W - 24)
+    status:SetHeight(34)
+    status:SetJustifyV("TOP")
+    local function say(text) ns.shareStatus = text; status:SetText(text) end
+    local function send()
+        box:ClearFocus()
+        local ok, err = ns.SendBuffs(box:GetText())
+        if not ok then say(err) end
+    end
+    box:SetScript("OnEnterPressed", send)
+    local function button(text, x, onClick)
+        local b = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+        b:SetSize(70, 22)
+        b:SetPoint("TOPLEFT", x, -6)
+        b:SetText(text)
+        b:SetScript("OnClick", function() Sound("IG_MAINMENU_OPTION_CHECKBOX_ON"); onClick() end)
+        return b
+    end
+    button("Target", 210, function()
+        local name = ns.ShareTargetName()
+        if name then box:SetText(name) else say("Target a player first.") end
+    end)
+    button("Send", 286, send)
+    ns.ShareSink = function(text) status:SetText(text) end
+    local function render()
+        status:SetText(ns.shareStatus ~= "" and ns.shareStatus
+            or "They are asked first. Only buffs they don't already track are added; nothing of theirs is changed.")
+        return 80
+    end
+    return row, render
+end
+
 --------------------------------------------------------------------------
 -- 7. PAGES
 --------------------------------------------------------------------------
@@ -763,6 +807,7 @@ local function definePages()
     local grid, renderGrid = BuildBuffGrid(page.content, className, currentClass)
     local active, renderActive = BuildActiveList(page.content)
     local addBox, renderAdd = BuildAddBox(page.content)
+    local shareRow, renderShare = BuildShareRow(page.content)
 
     -- Two clicks rather than a popup: a StaticPopup shown from addon code can hang the client
     -- in Gamepad mode, and this needs no dialog of its own. The first click arms the button
@@ -863,6 +908,19 @@ local function definePages()
                     Slider("expireAlpha", "Faded opacity", "How opaque a faded icon is. Only the icon fades: the minutes label stays fully readable.", 10, 100, 5,
                         { fmt = function(v) return v .. "%" end,
                           vis = function() return flagging() and ns.db.expireStyle == "FADE" end }),
+                } },
+            },
+        },
+        {
+            key = "share", title = "Share",
+            desc = "Send your list of tracked buffs to another player who has Unbuffed. They are asked first, and only buffs they don't already track are added.",
+            sections = {
+                { title = "Send your buffs", key = "send", rows = {
+                    { kind = "custom", frame = shareRow, render = renderShare },
+                } },
+                { title = "Receiving", key = "receive", rows = {
+                    Toggle("shareReceive", "Let other players offer me their buffs",
+                        "When someone offers to share their buffs you get an Accept / Decline prompt. Nothing arrives unless you accept, and only buffs you don't already track are added. Off declines every offer."),
                 } },
             },
         },
@@ -1111,7 +1169,7 @@ local function BuildWindow()
     leftLine:SetPoint("TOPLEFT", left, "TOPRIGHT"); leftLine:SetPoint("BOTTOMLEFT", left, "BOTTOMRIGHT")
 
     local y = -PAD + 4
-    for _, key in ipairs({ "buffs", "look", "expiring", "general" }) do
+    for _, key in ipairs({ "buffs", "look", "expiring", "share", "general" }) do
         local b = CreateFrame("Button", nil, left)
         b:SetSize(LEFT_W - 2 * PAD, 24)
         b:SetPoint("TOPLEFT", PAD, y)
@@ -1192,6 +1250,14 @@ function ns.ToggleOptions()
     frame:SetShown(not frame:IsShown())
 end
 
+-- Open the window on a given page, from outside it (/ub share).
+function ns.ShowOptionsPage(key)
+    if not ns.dbReady then return end
+    if not frame then BuildWindow() end
+    frame:Show()
+    Panel.Select(key)
+end
+
 -- Something outside the window changed a setting: redraw it.
 function ns.RefreshOptions()
     if frame and frame:IsShown() then Panel.Refresh() end
@@ -1260,6 +1326,13 @@ SlashCmdList.UNBUFFED = function(msg)
         ns.Print("not tracking anything called '" .. rest .. "'.")
     elseif cmd == "test" then
         ns.RunExpiryTest()
+    elseif cmd == "share" then
+        if rest == "" then
+            ns.ShowOptionsPage("share")
+        else
+            local ok, err = ns.SendBuffs(rest)
+            if not ok then ns.Print(err) else ns.Print("offered your buffs to " .. rest .. "; they are asked first.") end
+        end
     elseif cmd == "list" then
         if #ns.db.tracked == 0 then ns.Print("nothing tracked."); return end
         ns.Print("tracking:")
@@ -1268,6 +1341,6 @@ SlashCmdList.UNBUFFED = function(msg)
                 .. "  |cff888888[" .. table.concat(e.names, " / ") .. "]|r")
         end
     else
-        ns.Print("/ub  |cff888888(settings)|r  ·  add <name|id>  ·  remove <name>  ·  list  ·  test")
+        ns.Print("/ub  |cff888888(settings)|r  ·  add <name|id>  ·  remove <name>  ·  list  ·  test  ·  share [name]")
     end
 end
