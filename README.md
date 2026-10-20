@@ -16,13 +16,18 @@ buffed player shows nothing at all, so every icon you can see is something to ca
 
 ## Using it
 
-- `/unbuffed` (or `/ub`) opens the settings panel. Pick a class and tick the buffs to flag.
+- `/unbuffed` (or `/ub`) opens the settings window. Pick a class and tick the buffs to flag. It has
+  four pages -- **Buffs**, **Look**, **Expiring** and **General** -- in the style of FlareUI: the
+  pages on the left, the settings in the middle, and on the right what the setting you are pointing
+  at does. Settings that don't apply to your choices (the ring color, once the style has no ring)
+  are not shown. The entry under AddOns in the game's own settings just opens this window.
 - `/ub add <name or spell ID>` adds anything the class lists don't have.
 - `/ub remove <name>`, `/ub list`.
+- `/ub test` runs the expiring-buff look for 20 seconds, so you can see it.
 
 ## Choosing buffs
 
-The **Buffs to flag** section has a **Class** dropdown with all nine classes. Pick one
+The **Buffs** page has a **Class** choice with all nine classes. Pick one
 and it lists every buff that class casts on other players: for example the Paladin's
 blessings and auras, the Shaman's totem buffs, the Priest's Fortitude, Spirit and Shadow
 Protection. The dropdown starts on your own class. Tick any number of buffs, and switch
@@ -62,8 +67,9 @@ as missing.
 
 ## Where the icons go
 
-The **Position** section of the settings panel has a live preview of a nameplate, so
-each choice shows what it does as you pick it. The icon row can attach to:
+The **Look** page's **Position** section chooses where the icon row attaches. Above the settings
+on the Look and Expiring pages sits a live **preview** of a nameplate that stays put while the page
+scrolls, so each choice shows what it does as you make it. The icon row can attach to:
 
 - **Right of the level text** (the default): just past the level number.
 - **Left of the health bar**: against the bar's left end.
@@ -76,7 +82,8 @@ plate doesn't have falls back down a chain: level box, then health bar, then the
 itself -- friendly plates often have no level box, in which case the icon sits at the
 right end of the bar instead.
 
-**Look** covers icon size, opacity, spacing, **icon zoom** and the **icon style**.
+The **Look** page covers icon size, opacity, **layout**, spacing, a **cap** on how many icons are
+drawn, the **icon style** with the options that belong to it, **icon zoom**, and the position.
 
 **Icon zoom** crops into or out of the icon art. At 0% you see the whole texture,
 including Blizzard's own border; higher values magnify the middle. It is separate from
@@ -90,7 +97,24 @@ The styles are:
 
 The round styles use Blizzard's own circle art, so they ship nothing of their own, and
 they are offered only on clients that have it; elsewhere the choice is just Square.
-The preview in the Position section shows the style you pick.
+
+Each style shows its own options and hides the rest: the gold ring has a **ring color**; Square and
+Round have a **black outline** with a **thickness**.
+
+**Ring color** applies to the gold ring style: plain **Gold**, or **Class of the buff**, the
+color of the class that casts it (white for a Priest's buff, orange for a Druid's, and so on), so
+you can tell who to ask. A buff you added by name has no known class and keeps the gold ring.
+
+**Layout** is how several missing buffs sit side by side: **Row**, or **Overlapped**, where each
+icon covers the edge of the last (the spacing setting is ignored then).
+
+**Most icons shown** caps the group. When more buffs are missing than the cap, the last slot
+becomes a red **+N** chip standing for the rest. At the top of the slider there is no limit.
+
+**Black outline** (Square and Round) lays a black edge along the icon's border, from 1 to 4 pixels
+thick, laid over the icon's edge: the art keeps its size and only its outermost pixels are covered,
+square or round. A small icon holds it to a quarter of its size. The gold ring has an edge of its
+own, so it has no outline option.
 
 **Reset position and look** (two clicks,
 no popup) puts those back to their defaults and leaves the buffs you track alone.
@@ -108,9 +132,16 @@ it reads differently from a buff that was never cast at all. **Show them as** pi
 - **Amber tint** (the default): the icon turns amber.
 - **Faded icon**: the icon keeps its colour and becomes more transparent instead, by
   the **Faded opacity** you set (50% by default).
+- **Countdown sweep**: the icon stays as it is, and a clock-style wedge darkens it as the time
+  runs out. The wedge lies between the icon and its ring or outline, so the ring stays clean. The label turns amber, then orange under two minutes and red under one, and counts
+  seconds in the last minute.
+
+To see any of these without waiting for a real buff to run down, press **Test expiring look** (or
+type `/ub test`). For 20 seconds the first buff you track counts down from a full warning window to
+nothing, in the preview and on every friendly player's nameplate in view.
 
 Only the icon fades: the minutes-left label stays fully opaque, so it is always
-readable. The preview in the Position section includes an expiring example, so you can
+readable. The preview includes an expiring example, so you can
 see the effect as you change it. A buff whose remaining time this client will not report is never flagged, for the
 same reason an unreadable buff is never drawn as missing.
 

@@ -91,6 +91,12 @@ ns.defaults = {
     expiringMinutes = 5,     -- ...with this much left or less
     expireStyle = "TINT",    -- how such an icon differs: a key in ns.EXPIRE_STYLES
     expireAlpha = 50,        -- FADE only: percent opacity (of the icon opacity setting)
+    ringColor = "GOLD",      -- RING style only: a key in ns.RING_COLORS
+    layout    = "ROW",       -- how several icons sit: a key in ns.LAYOUTS
+    maxIcons  = 9,           -- most things drawn at once, "+N" chip included; 9 or more means no limit
+    outline   = false,       -- SQUARE and ROUND styles: a black edge round the icon
+    outlineSize = 1,         -- ...this many pixels thick (1 to 4)
+    optionsPage = "buffs",   -- the page the settings window was last on
     refresh   = 0.5,    -- seconds between re-checks of every visible plate
     greeted   = false,
 }
@@ -106,8 +112,30 @@ ns.ICON_STYLES = {
 -- How an icon about to expire is told apart from one that was never cast. Only the
 -- icon changes; the minutes-left label beside it always stays fully opaque.
 ns.EXPIRE_STYLES = {
-    { key = "TINT", label = "Amber tint" },
-    { key = "FADE", label = "Faded icon" },
+    { key = "TINT",  label = "Amber tint" },
+    { key = "FADE",  label = "Faded icon" },
+    { key = "SWEEP", label = "Countdown sweep" },
+}
+
+-- The most the icon art can be zoomed in, in percent cropped from each edge. Past this the icon is
+-- magnified into a blur; the slider stops here and drawing holds any saved value to it.
+ns.MAX_ZOOM = 15
+
+-- Marks "no limit" on the icon cap: the slider's top value. A cap of N means at most N things
+-- are drawn, so when more are missing the last slot becomes a "+N" chip for the rest.
+ns.NO_ICON_LIMIT = 9
+ns.MIN_ICON_LIMIT = 2
+
+-- How several missing buffs sit side by side. OVERLAP ignores the spacing setting.
+ns.LAYOUTS = {
+    { key = "ROW",     label = "Row" },
+    { key = "OVERLAP", label = "Overlapped" },
+}
+
+-- What colour the ring of the RING style is.
+ns.RING_COLORS = {
+    { key = "GOLD",  label = "Gold" },
+    { key = "CLASS", label = "Class of the buff" },
 }
 
 -- The anchor choices, in the order the panel lists them. `help` is the line the panel
@@ -252,6 +280,11 @@ ns.On("ADDON_LOADED", function(_, name)
     if type(UnbuffedDB) == "table" and UnbuffedDB.anchor == nil then
         local legacy = { RIGHT = "LEVEL_RIGHT", LEFT = "BAR_LEFT", CENTER = "CUSTOM" }
         UnbuffedDB.anchor = legacy[UnbuffedDB.side]
+    end
+    -- A column layout and pop-in animation were offered briefly and then removed.
+    if type(UnbuffedDB) == "table" then
+        if UnbuffedDB.layout == "COLUMN" then UnbuffedDB.layout = "ROW" end
+        UnbuffedDB.popIn = nil
     end
     UnbuffedDB = copyDefaults(ns.defaults, UnbuffedDB)
     ns.db = UnbuffedDB

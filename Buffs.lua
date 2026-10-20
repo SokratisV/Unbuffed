@@ -214,6 +214,25 @@ function ns.FindPreset(key)
     end
 end
 
+-- The class that casts a listed buff, by its key; nil for one added by name or id, which
+-- has no class we know of. Built once, on first use.
+local classOf
+function ns.ClassOfBuff(key)
+    if not classOf then
+        classOf = {}
+        for token, list in pairs(ns.CLASS_BUFFS) do
+            for _, entry in ipairs(list) do classOf[entry.key] = token end
+        end
+    end
+    return key and classOf[key] or nil
+end
+
+-- The class's colour as r, g, b, or nil where the client has none for it.
+function ns.ClassColor(token)
+    local c = token and _G.RAID_CLASS_COLORS and _G.RAID_CLASS_COLORS[token]
+    if c then return c.r, c.g, c.b end
+end
+
 -- The icon for a buff: the literal path when it has one, else whatever the client says
 -- the spell's icon is, else a question mark.
 function ns.PresetIcon(preset)
