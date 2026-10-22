@@ -100,6 +100,11 @@ ns.defaults = {
     shareReceive = true,     -- let other players offer you their buff list (you still get asked)
     refresh   = 0.5,    -- seconds between re-checks of every visible plate
     greeted   = false,
+    -- One entry per character, keyed "Name-Realm": that character's own tracked list, which class it
+    -- last browsed, and which of its class's main buffs have already been ticked for it. The
+    -- tracked list at the top is the current character's (the same table), and the account's
+    -- old shared list is kept as legacyTracked until every character has been given its own.
+    chars     = {},
 }
 
 -- How each icon is drawn, in the order the panel lists them. SQUARE is the stock
@@ -151,10 +156,6 @@ ns.ANCHORS = {
     { key = "CUSTOM",      label = "Custom",
       help = "Measured from the centre of the nameplate. Set the offsets below." },
 }
-
--- Tracked from the start on a fresh profile, so the addon does something visible
--- before the panel is ever opened.
-ns.SEED_PRESETS = { "fortitude" }
 
 local function copyDefaults(src, dst)
     if type(dst) ~= "table" then dst = {} end
@@ -258,14 +259,60 @@ end
 --------------------------------------------------------------------------
 -- Lifecycle
 --------------------------------------------------------------------------
--- Put the starting buffs into a profile that has never existed. Only a brand-new
--- profile gets them: keying this to "no saved table at all" rather than to an empty
--- tracked list means someone who deliberately cleared the list is never handed
--- Fortitude back, and an existing profile is never changed under its owner.
-local function seedTracked()
-    for _, key in ipairs(ns.SEED_PRESETS) do
-        local preset = ns.FindPreset(key)
-        if preset then ns.AddTracked(ns.PresetEntry(preset)) end
+local function deepCopy(v)
+    if type(v) ~= "table" then return v end
+    local out = {}
+    for k, x in pairs(v) do out[k] = deepCopy(x) end
+    return out
+end
+
+-- The character's key in ns.db.chars: "Name-Realm", with Forever's surname standing in for the realm.
+local function charKey()
+    local getName = _G.UnitNameUnmodified or UnitName
+    local name, second = getName("player")
+    if not name or name == "" or ns.IsSecret(name) then return "unknown" end
+    if not second or second == "" or ns.IsSecret(second) then second = _G.GetRealmName and GetRealmName() or "" end
+    return name .. "-" .. second
+end
+
+-- Give the character logging in its own tracked list, the first time it is seen. The account's old
+-- shared list is carried over where it fits: a buff of the character's own class stays, one that
+-- belongs to another class (a Priest's Fortitude on a new Paladin) does not, and anything added by
+-- name or id comes along. Then ns.db.tracked is pointed at the character's list, so everything
+-- that reads it reads the right one. Safe to run more than once.
+function ns.AttachCharacter()
+    local key = charKey()
+    local c = ns.db.chars[key]
+    if not c then
+        c = { tracked = {}, auto = {} }
+        ns.db.chars[key] = c
+        local mine = ns.PlayerClass()
+        for _, e in ipairs(ns.db.legacyTracked or {}) do
+            local owner = type(e.key) == "string" and ns.FindPreset(e.key) and ns.ClassOfBuff(e.key)
+            if not owner or owner == mine then c.tracked[#c.tracked + 1] = deepCopy(e) end
+        end
+    end
+    c.tracked = c.tracked or {}
+    c.auto = c.auto or {}
+    ns.char = c
+    ns.db.tracked = c.tracked
+    ns.attached = true
+    ns.ApplyMains()
+end
+
+-- Tick the class's main buffs (ns.MAIN_BUFFS) for this character, each once, the first time it knows
+-- the spell: a level 1 Paladin gets Might at level 4, and a buff unticked afterwards stays unticked.
+function ns.ApplyMains()
+    local mains = ns.MAIN_BUFFS[ns.PlayerClass() or ""]
+    if not mains or not ns.char then return end
+    for _, key in ipairs(mains) do
+        if not ns.char.auto[key] then
+            local preset = ns.FindPreset(key)
+            if preset and ns.PresetAvailable(preset) and ns.KnowsBuff(preset) then
+                ns.char.auto[key] = true
+                if not ns.FindTracked(key) then ns.AddTracked(ns.PresetEntry(preset)) end
+            end
+        end
     end
 end
 
@@ -292,18 +339,34 @@ ns.On("ADDON_LOADED", function(_, name)
     -- Nothing may read or write settings before this point. The options panel in
     -- particular must not build itself against the stand-in table.
     ns.dbReady = true
-    if fresh then seedTracked() end
+    -- Before this version the tracked list belonged to the account. Keep it, once, for the
+    -- characters that have not been given their own yet.
+    if not fresh and next(ns.db.chars) == nil and ns.db.legacyTracked == nil and #ns.db.tracked > 0 then
+        ns.db.legacyTracked = deepCopy(ns.db.tracked)
+    end
 end)
 
 ns.On("PLAYER_LOGIN", function()
-    if not ns.db.greeted and #ns.db.tracked == 0 then
-        ns.db.greeted = true
+    ns.AttachCharacter()
+    if not ns.char.greeted and #ns.db.tracked == 0 then
+        ns.char.greeted = true
         ns.Print("nothing is being tracked yet -- open |cffffd100/unbuffed|r and tick the buffs you want flagged.")
     end
     -- The addon draws on friendly player nameplates, so it is invisible while the
     -- client isn't showing any. Worth saying once rather than looking broken.
     ns.CheckNameplateCVar()
 end)
+
+-- Learning a spell (or levelling up, or a talent change) can make a main buff known.
+local function spellsChanged()
+    if not ns.attached then return end
+    ns.ResetKnown()
+    ns.ApplyMains()
+    if ns.RefreshAll then ns.RefreshAll() end
+    if ns.RefreshOptions then ns.RefreshOptions() end
+end
+ns.On("SPELLS_CHANGED", spellsChanged)
+ns.On("PLAYER_LEVEL_UP", spellsChanged)
 
 function ns.Print(msg)
     DEFAULT_CHAT_FRAME:AddMessage("|cff66ccffUnbuffed|r: " .. msg)

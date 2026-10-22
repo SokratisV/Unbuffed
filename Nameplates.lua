@@ -544,7 +544,7 @@ local function updatePlate(unit, plate)
     local window = db.expiringMinutes * 60
     local testLeft = db.flagExpiring and ns.TestLeft(db) or nil   -- a test in progress, if any
     for _, entry in ipairs(db.tracked) do
-        if entry.enabled then
+        if entry.enabled and ns.EntryUsable(entry) then
             local expiring, left, found, aura, simulated
             if testLeft then
                 -- the first buff tracked stands in for one running out, whatever the unit has

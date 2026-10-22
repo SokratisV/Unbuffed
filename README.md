@@ -53,9 +53,31 @@ A Rogue has no buffs of that kind, so that class's list is empty; anything else 
 always be added by name or spell ID. A few buffs exist only on the TBC clients
 (Commanding Shout, Tranquil Air, Wrath of Air Totem) and are left out on Forever.
 
-**Fortitude is tracked out of the box** on a fresh profile, so the addon does something
-visible before you open the panel; untick it like any other buff if you don't want it.
-It is seeded once per profile, not re-added on every load.
+**Every character has its own list**, made the first time it logs in, with its class's main buffs
+already ticked:
+
+| Class | Ticked for you |
+| --- | --- |
+| Priest | Fortitude |
+| Druid | Mark of the Wild |
+| Mage | Arcane Intellect |
+| Warrior | Battle Shout |
+| Paladin | Blessing of Kings, Might and Wisdom |
+| Shaman, Warlock, Hunter, Rogue | nothing: every buff is still in the list to tick |
+
+A main is ticked **the first time the character knows the spell**, so a new Paladin gets Might at
+level 4 and Wisdom when it learns it. It is ticked once: untick it and it stays unticked. Each
+character's list, and the class it last looked at in the Buffs page, are its own, so a new character
+never opens on another character's buffs.
+
+**A buff of your own class is only flagged once you know a rank of it** (any rank counts, and a talent
+counts once it is taken). Until then it stays in the list, with a note in its tooltip, but draws no
+icon. Another class's buff, which you can only ask for, and anything you added by name or ID, is
+always flagged. A buff cast by a pet (Blood Pact) can't be in your spellbook, so it counts as known.
+
+Characters from before this version keep what they had: the old shared list is carried over to each
+character where it fits (a Priest keeps its Fortitude, a new Paladin does not inherit it), and
+anything you added by name or ID goes to every character.
 
 ## Sharing your buffs
 

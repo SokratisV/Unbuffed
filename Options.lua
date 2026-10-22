@@ -547,6 +547,10 @@ local function ShowBuffTooltip(owner, key, label, names, ids)
             GameTooltip:AddLine(("Showing the rank for your level (%d)."):format(level), TIP_GREY[1], TIP_GREY[2], TIP_GREY[3])
         end
     end
+    if key and ns.FindPreset(key) and not ns.EntryUsable({ key = key }) then
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("You haven't learned this yet, so it won't be flagged until you do.", 1, 0.82, 0, true)
+    end
     GameTooltip:AddLine(" ")
     GameTooltip:AddLine("Matched by name: " .. table.concat(names or {}, ", ") .. ".", TIP_GREY[1], TIP_GREY[2], TIP_GREY[3], true)
     GameTooltip:Show()
@@ -785,7 +789,7 @@ end
 local function definePages()
     local classList = ns.ClassList()
     local defaultClass = ns.PlayerClass() or classList[1].key   -- start on your own class
-    local function currentClass() return ns.db.browseClass or defaultClass end
+    local function currentClass() return (ns.char and ns.char.browseClass) or defaultClass end
     local function className(key)
         for _, c in ipairs(classList) do if c.key == key then return c.name end end
         return key
@@ -840,7 +844,7 @@ local function definePages()
                     { kind = "choice", label = "Class",
                       desc = "Lists every buff this class casts on other players. Tick any number, and switch class to add more: the choices accumulate. It starts on your own class.",
                       tip = "Hover a buff for its tooltip, at the rank that suits your level.",
-                      choices = classChoices, get = currentClass, set = function(v) ns.db.browseClass = v end },
+                      choices = classChoices, get = currentClass, set = function(v) if ns.char then ns.char.browseClass = v end end },
                     { kind = "custom", frame = grid, render = renderGrid },
                 } },
                 { title = function() return "Active buffs (" .. #ns.db.tracked .. ")" end, key = "active", rows = {

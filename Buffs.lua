@@ -18,6 +18,8 @@ local ADDON, ns = ...
 --
 -- `tbc` marks buffs that only exist on the TBC clients, and are left out on Forever.
 --
+-- `pet` marks a buff that is cast by a pet, so it is never in the player's own spellbook.
+--
 -- Icons are literal for the nine buffs that shipped before this list was organised by
 -- class, so they stay exactly as they were. The keys of those nine are also what saved
 -- profiles refer to: never rename one.
@@ -85,7 +87,7 @@ ns.CLASS_BUFFS = {
     WARLOCK = {
         -- Soulstone's id is the spell that creates the stone, which shares the buff's icon.
         { key = "soulstone",    label = "Soulstone",       names = { "Soulstone Resurrection" }, id = 693 },
-        { key = "bloodpact",    label = "Blood Pact",      names = { "Blood Pact" },             id = 6307 },
+        { key = "bloodpact",    label = "Blood Pact",      names = { "Blood Pact" },             id = 6307, pet = true },
         { key = "unendbreath",  label = "Unending Breath", names = { "Unending Breath" },        id = 5697 },
     },
     WARRIOR = {
@@ -170,6 +172,69 @@ local CLASS_TOKENS = { "DRUID", "HUNTER", "MAGE", "PALADIN", "PRIEST", "ROGUE", 
 -- of that content.
 local function available(entry)
     return not (entry.tbc and ns.IsForever)
+end
+
+-- The buffs a character of each class has ticked for them, once, the first time they know the spell
+-- (see ns.ApplyMains). The classes with many options -- and the Rogue, who has none -- start with
+-- nothing ticked, and every buff stays on offer in the list.
+ns.MAIN_BUFFS = {
+    PRIEST  = { "fortitude" },
+    DRUID   = { "motw" },
+    MAGE    = { "intellect" },
+    WARRIOR = { "bshout" },
+    PALADIN = { "kings", "might", "wisdom" },
+}
+
+-- Does the character know at least one rank of a buff's spell? Any rank id counts, the group
+-- version's too, and a talent counts once it is taken. A buff cast by a pet cannot be in the
+-- character's book, so it counts as known; and so does everything on a client with no way to ask.
+local knownCache = {}
+function ns.ResetKnown() for k in pairs(knownCache) do knownCache[k] = nil end end
+
+local function spellKnown(id)
+    if C_SpellBook and C_SpellBook.IsSpellKnown then
+        local ok, r = pcall(C_SpellBook.IsSpellKnown, id)
+        if ok and r then return true end
+    end
+    if _G.IsPlayerSpell then
+        local ok, r = pcall(_G.IsPlayerSpell, id)
+        if ok and r then return true end
+    end
+    if _G.IsSpellKnown then
+        local ok, r = pcall(_G.IsSpellKnown, id)
+        if ok and r then return true end
+    end
+    return false
+end
+
+function ns.KnowsBuff(preset)
+    if preset.pet then return true end
+    if not ((C_SpellBook and C_SpellBook.IsSpellKnown) or _G.IsPlayerSpell or _G.IsSpellKnown) then return true end
+    local cached = knownCache[preset.key]
+    if cached ~= nil then return cached end
+    local ids = { preset.id }
+    local ranks = ns.RANKS[preset.key]
+    if ranks then
+        for _, list in ipairs({ ranks.forever or {}, ranks.tbc or {} }) do
+            for _, rank in ipairs(list) do ids[#ids + 1] = rank[2] end
+        end
+    end
+    local known = false
+    for _, id in ipairs(ids) do
+        if id and spellKnown(id) then known = true break end
+    end
+    knownCache[preset.key] = known
+    return known
+end
+
+-- Whether a tracked entry should be flagged at all. A buff of the player's own class is only
+-- flagged once they know it; anything else -- another class's buff, which they can only ask
+-- for, or one added by name or id -- always is.
+function ns.EntryUsable(entry)
+    local preset = ns.FindPreset(entry.key)
+    if not preset then return true end
+    if ns.ClassOfBuff(entry.key) ~= ns.PlayerClass() then return true end
+    return ns.KnowsBuff(preset)
 end
 
 -- Whether this client has a listed buff (a TBC-only one is left out on Forever).
