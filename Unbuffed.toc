@@ -12,7 +12,7 @@
 ## Notes-zhTW: 在缺少你所追蹤增益的友方玩家名條旁，以一排小圖示標記 (/unbuffed)。
 ## Notes-itIT: Segnala le targhette dei giocatori amichevoli a cui mancano i potenziamenti che monitori, con una piccola fila di icone accanto alla targhetta (/unbuffed).
 ## Author: Sokratis
-## Version: 1.8.0
+## Version: 1.9.0
 ## SavedVariables: UnbuffedDB
 ## IconTexture: Interface\AddOns\Unbuffed\Media\Icon
 ## X-License: MIT
