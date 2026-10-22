@@ -1,6 +1,16 @@
 ## Interface: 16001, 20505
 ## Title: Unbuffed
 ## Notes: Flags friendly player nameplates that are missing the buffs you track, with a small icon row beside the plate (/unbuffed).
+## Notes-deDE: Markiert Namensplaketten freundlicher Spieler, denen die von dir verfolgten Stärkungszauber fehlen, mit einer kleinen Symbolreihe neben der Plakette (/unbuffed).
+## Notes-frFR: Signale les plaques de nom des joueurs amicaux à qui il manque les améliorations que vous suivez, avec une petite rangée d'icônes à côté de la plaque (/unbuffed).
+## Notes-esES: Señala las placas de nombre de los jugadores amistosos a los que les faltan los beneficios que sigues, con una pequeña fila de iconos junto a la placa (/unbuffed).
+## Notes-esMX: Señala las placas de nombre de los jugadores amistosos a los que les faltan los beneficios que sigues, con una pequeña fila de iconos junto a la placa (/unbuffed).
+## Notes-ptBR: Sinaliza as placas de identificação de jogadores amigáveis que não têm os bônus que você monitora, com uma pequena fileira de ícones ao lado da placa (/unbuffed).
+## Notes-ruRU: Отмечает таблички с именами дружественных игроков, у которых нет отслеживаемых вами баффов, небольшим рядом значков рядом с табличкой (/unbuffed).
+## Notes-koKR: 내가 추적하는 버프가 없는 우호적인 플레이어의 이름표 옆에 작은 아이콘 줄로 표시합니다 (/unbuffed).
+## Notes-zhCN: 在缺少你所追踪增益的友方玩家姓名板旁，用一排小图标进行标记 (/unbuffed)。
+## Notes-zhTW: 在缺少你所追蹤增益的友方玩家名條旁，以一排小圖示標記 (/unbuffed)。
+## Notes-itIT: Segnala le targhette dei giocatori amichevoli a cui mancano i potenziamenti che monitori, con una piccola fila di icone accanto alla targhetta (/unbuffed).
 ## Author: Sokratis
 ## Version: 1.8.0
 ## SavedVariables: UnbuffedDB
@@ -8,9 +18,21 @@
 ## X-License: MIT
 ## X-Curse-Project-ID: 1735472
 
+Locales\Locale.lua
+Locales\deDE.lua
+Locales\frFR.lua
+Locales\esES.lua
+Locales\esMX.lua
+Locales\ptBR.lua
+Locales\ruRU.lua
+Locales\koKR.lua
+Locales\zhCN.lua
+Locales\zhTW.lua
+Locales\itIT.lua
 Core.lua
 Buffs.lua
 Auras.lua
 Nameplates.lua
 Share.lua
+Profile.lua
 Options.lua

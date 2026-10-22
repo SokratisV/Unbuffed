@@ -1,4 +1,5 @@
 local ADDON, ns = ...
+local L = ns.L
 
 -- The settings window (/ub), in the visual language of FlareUI by Malkkav (MIT), as the Garu
 -- Combat Text window is: bronze trim over Blizzard's Collections tile, the pages in a list on
@@ -124,7 +125,7 @@ end
 
 local function ShowPageInfo()
     local p = pageByKey and pageByKey[current]
-    if p then ShowInfo(val(p.title), val(p.desc), "Hover any setting to see what it does.") end
+    if p then ShowInfo(val(p.title), val(p.desc), L["Hover any setting to see what it does."]) end
 end
 
 --------------------------------------------------------------------------
@@ -148,6 +149,10 @@ local function Forward(control, f)
     control:HookScript("OnLeave", function() RowLeave(f) end)
 end
 
+-- How much room each kind of row leaves for its name, beside the control at the right. German and
+-- Russian run a third longer than English, so a name wraps (to two lines) rather than reaching the control.
+local LABEL_W = { toggle = CONTENT_W - 44, choice = CONTENT_W - 240, slider = CONTENT_W - 250, button = CONTENT_W - 230 }
+
 local function NewRow(parent, kind)
     local f = CreateFrame("Frame", nil, parent)
     f:SetHeight(ROW_H)
@@ -160,8 +165,12 @@ local function NewRow(parent, kind)
     f.hover:Hide()
     f.label = Text(f, "GameFontHighlight")
     f.label:SetPoint("LEFT", 6, 0)
+    f.label:SetJustifyV("MIDDLE")
+    f.label:SetWordWrap(true)
+    pcall(f.label.SetMaxLines, f.label, 2)
     f.kind = kind
     Build[kind](f)
+    f.label:SetWidth(LABEL_W[kind] or CONTENT_W)
     return f
 end
 
@@ -425,7 +434,7 @@ local function BuildPreview(parent, header)
     bottom:SetPoint("BOTTOMLEFT"); bottom:SetPoint("BOTTOMRIGHT")
     local label = Text(box, "GameFontDisableSmall")
     label:SetPoint("TOPLEFT", 6, -5)
-    label:SetText("Preview")
+    label:SetText(L["Preview"])
     pv.box = box
 
     local mock = CreateFrame("Frame", nil, box)
@@ -457,7 +466,7 @@ local function BuildPreview(parent, header)
 
     local mockName = mock:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     mockName:SetPoint("BOTTOM", bar, "TOP", 0, 3)
-    mockName:SetText("Adventurer")
+    mockName:SetText(L["Adventurer"])
 
     local row = ns.NewRow(box)
     row:SetFrameLevel(box:GetFrameLevel() + 6)
@@ -485,17 +494,17 @@ local function BuildPreview(parent, header)
 
     -- Test: runs the first tracked buff down, here and on every plate (see ns.StartExpiryTest).
     local test = CreateFrame("Button", nil, box, "UIPanelButtonTemplate")
-    test:SetSize(140, 20)
+    test:SetSize(190, 20)
     test:SetPoint("TOPRIGHT", -6, -4)
-    test:SetText("Test expiring look")
+    test:SetText(L["Test expiring look"])
     test:SetScript("OnClick", function()
         Sound("IG_MAINMENU_OPTION_CHECKBOX_ON")
         ns.RunExpiryTest()
     end)
     test:SetScript("OnEnter", function()
-        ShowInfo("Test expiring look",
-            "Runs the first buff you track down from a full warning window to nothing over 20 seconds, in this preview and on every friendly player's nameplate in view, so you can see the expiring look without waiting for a real buff.",
-            "Needs Also flag buffs about to expire. Also /ub test.")
+        ShowInfo(L["Test expiring look"],
+            L["Runs the first buff you track down from a full warning window to nothing over 20 seconds, in this preview and on every friendly player's nameplate in view, so you can see the expiring look without waiting for a real buff."],
+            L["Needs %s. Also /ub test."]:format(L["Also flag buffs about to expire"]))
     end)
     test:SetScript("OnLeave", ShowPageInfo)
     pv.test = test
@@ -542,17 +551,17 @@ local function ShowBuffTooltip(owner, key, label, names, ids)
     if described and byLevel then
         GameTooltip:AddLine(" ")
         if learnedAt > level then
-            GameTooltip:AddLine(("Your level (%d) is below this buff's first rank, which is learned at level %d."):format(level, learnedAt), 1, 0.82, 0, true)
+            GameTooltip:AddLine((L["Your level (%d) is below this buff's first rank, which is learned at level %d."]):format(level, learnedAt), 1, 0.82, 0, true)
         else
-            GameTooltip:AddLine(("Showing the rank for your level (%d)."):format(level), TIP_GREY[1], TIP_GREY[2], TIP_GREY[3])
+            GameTooltip:AddLine((L["Showing the rank for your level (%d)."]):format(level), TIP_GREY[1], TIP_GREY[2], TIP_GREY[3])
         end
     end
     if key and ns.FindPreset(key) and not ns.EntryUsable({ key = key }) then
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("You haven't learned this yet, so it won't be flagged until you do.", 1, 0.82, 0, true)
+        GameTooltip:AddLine(L["You haven't learned this yet, so it won't be flagged until you do."], 1, 0.82, 0, true)
     end
     GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("Matched by name: " .. table.concat(names or {}, ", ") .. ".", TIP_GREY[1], TIP_GREY[2], TIP_GREY[3], true)
+    GameTooltip:AddLine(L["Matched by name: %s."]:format(table.concat(names or {}, ", ")), TIP_GREY[1], TIP_GREY[2], TIP_GREY[3], true)
     GameTooltip:Show()
 end
 
@@ -585,7 +594,7 @@ local function BuildBuffGrid(parent, className, currentClass)
             Applied(); Changed()
         end)
         w:SetScript("OnEnter", function(self)
-            ShowBuffTooltip(self, self.preset.key, self.preset.label, self.preset.names)
+            ShowBuffTooltip(self, self.preset.key, ns.BuffLabel(self.preset), self.preset.names)
         end)
         w:SetScript("OnLeave", function() GameTooltip:Hide() end)
         pool[i] = w
@@ -602,7 +611,7 @@ local function BuildBuffGrid(parent, className, currentClass)
             local w = tick(i)
             w.preset = preset
             w.icon:SetTexture(ns.PresetIcon(preset))
-            w.text:SetText(preset.label)
+            w.text:SetText(ns.BuffLabel(preset))
             local e = ns.FindTracked(preset.key)
             w:SetChecked(e and e.enabled and true or false)
             local col, row = (i - 1) % GRID_COLS, math.floor((i - 1) / GRID_COLS)
@@ -612,8 +621,7 @@ local function BuildBuffGrid(parent, className, currentClass)
         end
         for i = #list + 1, #pool do pool[i]:Hide() end
         if #list == 0 then
-            empty:SetText(className(classKey) .. " has no buffs worth flagging on other players. "
-                .. "Anything else can still be added by name below.")
+            empty:SetText(L["%s has no buffs worth flagging on other players. Anything else can still be added by name below."]:format(className(classKey)))
             empty:Show()
             return 36
         end
@@ -621,6 +629,13 @@ local function BuildBuffGrid(parent, className, currentClass)
         return math.ceil(#list / GRID_COLS) * TICK_H + 4
     end
     return grid, render
+end
+
+-- What an entry in the Active list is called: a listed buff by the client's own name for its spell, anything
+-- added by hand by what it was added as.
+local function chipLabel(e)
+    local preset = ns.FindPreset(e.key)
+    return preset and ns.BuffLabel(preset) or e.label or e.key
 end
 
 -- Everything being tracked, from any class, each with a button to drop it.
@@ -639,7 +654,7 @@ local function BuildActiveList(parent)
             if not e then return end
             -- a listed buff gets its level-appropriate rank; one added by name or id is shown as it is
             local listed = ns.FindPreset(e.key) and e.key or nil
-            ShowBuffTooltip(self, listed, e.label or e.key, e.names, e.ids)
+            ShowBuffTooltip(self, listed, chipLabel(e), e.names, e.ids)
         end)
         c:SetScript("OnLeave", function() GameTooltip:Hide() end)
         c.icon = c:CreateTexture(nil, "ARTWORK")
@@ -666,7 +681,7 @@ local function BuildActiveList(parent)
     local empty = Text(list, "GameFontDisableSmall")
     empty:SetWidth(CONTENT_W - 20)
     empty:SetPoint("TOPLEFT", 8, -4)
-    empty:SetText("Nothing is being tracked yet. Pick a class above and tick the buffs you want flagged.")
+    empty:SetText(L["Nothing is being tracked yet. Pick a class above and tick the buffs you want flagged."])
 
     local function render()
         local n = #ns.db.tracked
@@ -674,7 +689,7 @@ local function BuildActiveList(parent)
             local c = chip(i)
             c.entry = e
             c.icon:SetTexture(e.icon or ns.FALLBACK_ICON)
-            c.text:SetText(e.label or e.key)
+            c.text:SetText(chipLabel(e))
             c:SetAlpha(e.enabled == false and 0.5 or 1)
             local col, row = (i - 1) % GRID_COLS, math.floor((i - 1) / GRID_COLS)
             c:ClearAllPoints()
@@ -699,11 +714,11 @@ local function BuildAddBox(parent)
     local btn = CreateFrame("Button", nil, add, "UIPanelButtonTemplate")
     btn:SetSize(70, 22)
     btn:SetPoint("LEFT", box, "RIGHT", 6, 0)
-    btn:SetText("Add")
+    btn:SetText(L["Add"])
     local hint = Text(add, "GameFontDisableSmall")
     hint:SetPoint("TOPLEFT", 12, -32)
     hint:SetWidth(CONTENT_W - 20)
-    hint:SetText("Buff name or spell ID. A name matches every rank; an ID also survives combat.")
+    hint:SetText(L["Buff name or spell ID. A name matches every rank; an ID also survives combat."])
 
     local function doAdd()
         local text = (box:GetText() or ""):gsub("^%s+", ""):gsub("%s+$", "")
@@ -714,7 +729,7 @@ local function BuildAddBox(parent)
         box:SetText("")
         box:ClearFocus()
         Applied(); Changed()
-        ns.Print("now flagging |cffffd100" .. entry.label .. "|r.")
+        ns.Print(L["now flagging |cffffd100%s|r."]:format(entry.label))
     end
     btn:SetScript("OnClick", doAdd)
     box:SetScript("OnEnterPressed", doAdd)
@@ -746,24 +761,124 @@ local function BuildShareRow(parent)
     box:SetScript("OnEnterPressed", send)
     local function button(text, x, onClick)
         local b = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-        b:SetSize(70, 22)
+        b:SetSize(90, 22)
         b:SetPoint("TOPLEFT", x, -6)
         b:SetText(text)
         b:SetScript("OnClick", function() Sound("IG_MAINMENU_OPTION_CHECKBOX_ON"); onClick() end)
         return b
     end
-    button("Target", 210, function()
+    button(L["Target"], 210, function()
         local name = ns.ShareTargetName()
-        if name then box:SetText(name) else say("Target a player first.") end
+        if name then box:SetText(name) else say(L["Target a player first."]) end
     end)
-    button("Send", 286, send)
+    button(L["Send"], 306, send)
     ns.ShareSink = function(text) status:SetText(text) end
     local function render()
         status:SetText(ns.shareStatus ~= "" and ns.shareStatus
-            or "They are asked first. Only buffs they don't already track are added; nothing of theirs is changed.")
+            or L["They are asked first. Only buffs they don't already track are added; nothing of theirs is changed."])
         return 80
     end
     return row, render
+end
+
+-- Exporting and importing a whole setup (see Profile.lua): a box to copy from and paste into, the buttons
+-- that fill it and read it, and a line saying what happened.
+local function BuildProfileRow(parent)
+    local row = CreateFrame("Frame", nil, parent)
+    local ok, sf = pcall(CreateFrame, "ScrollFrame", nil, row, "InputScrollFrameTemplate")
+    local box
+    if ok and sf and sf.EditBox then
+        sf:SetPoint("TOPLEFT", 12, -6)
+        sf:SetSize(CONTENT_W - 36, 110)
+        if sf.CharCount then sf.CharCount:Hide() end
+        box = sf.EditBox
+        box:SetWidth(CONTENT_W - 64)
+        box:SetMaxLetters(0)
+    else
+        box = CreateFrame("EditBox", nil, row, "InputBoxTemplate")
+        box:SetPoint("TOPLEFT", 14, -6)
+        box:SetSize(CONTENT_W - 36, 110)
+        box:SetMultiLine(true)
+    end
+    if ChatFontNormal then box:SetFontObject(ChatFontNormal) end
+    box:SetAutoFocus(false)
+    box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+
+    local status = Text(row, "GameFontHighlightSmall")
+    status:SetPoint("TOPLEFT", 12, -124)
+    status:SetWidth(CONTENT_W - 24)
+    status:SetHeight(30)
+    status:SetJustifyV("TOP")
+    status:SetText(L["Export copies your whole setup as text. Import reads text someone, or you, copied earlier."])
+
+    local parsed
+    local importAll, importSettings
+    local function reset() parsed = nil; importAll:Hide(); importSettings:Hide() end
+    local function say(text) status:SetText(text) end
+
+    local function button(text, x, y, w, onClick)
+        local b = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+        b:SetSize(w, 22)
+        b:SetPoint("TOPLEFT", x, y)
+        b:SetText(text)
+        b:SetScript("OnClick", function() Sound("IG_MAINMENU_OPTION_CHECKBOX_ON"); onClick() end)
+        return b
+    end
+
+    local function doExport()
+        reset()
+        local text, n = ns.ExportProfile()
+        box:SetText(text)
+        box:HighlightText()
+        box:SetFocus()
+        say((L["Exported your settings and %d buffs. Press Ctrl+C to copy, then paste it wherever you like."]):format(n))
+    end
+    local function doPreview()
+        reset()
+        local profile, err = ns.ParseProfile(box:GetText())
+        if not profile then say("|cffff6060" .. err .. "|r") return end
+        parsed = profile
+        local differ, buffs = ns.CompareProfile(profile)
+        local msg = (L["%d of the settings differ from yours; the profile has %d buffs."]):format(differ, buffs)
+        if profile.ignored + profile.invalid > 0 then
+            msg = msg .. " " .. (L["%d entries were ignored (not valid here)."]):format(profile.ignored + profile.invalid)
+        end
+        say(msg)
+        importSettings:Show()
+        if profile.buffs then
+            importAll:Show()
+            importSettings:ClearAllPoints()
+            importSettings:SetPoint("TOPLEFT", 208, -188)
+        else
+            importSettings:ClearAllPoints()
+            importSettings:SetPoint("TOPLEFT", 12, -188)
+        end
+    end
+    local function doImport(withBuffs)
+        local profile = parsed
+        if not profile then return end
+        reset()
+        local changed, set, skipped = ns.ApplyProfile(profile, withBuffs)
+        local msg = (L["Imported: %d settings changed."]):format(changed)
+        if withBuffs then msg = msg .. " " .. (L["%d buffs set."]):format(set) end
+        if skipped > 0 then msg = msg .. " " .. (L["%d buffs this client can't use were skipped."]):format(skipped) end
+        say(msg)
+        ns.Print(msg)
+    end
+
+    button(L["Export"], 12, -158, 90, doExport)
+    button(L["Preview import"], 108, -158, 150, doPreview)
+    button(L["Clear"], 264, -158, 70, function() box:SetText(""); reset(); say("") end)
+    importAll = button(L["Import everything"], 12, -188, 190, function() doImport(true) end)
+    importSettings = button(L["Import settings only"], 208, -188, 190, function() doImport(false) end)
+    importAll:Hide(); importSettings:Hide()
+
+    -- from outside (/ub export, /ub import)
+    ns.profileUI = {
+        export = doExport,
+        focus = function() box:SetFocus() end,
+    }
+    return row, function() return 222 end
 end
 
 --------------------------------------------------------------------------
@@ -779,7 +894,7 @@ end
 -- Start the expiring-look test, as the Test button and /ub test do.
 function ns.RunExpiryTest()
     if not ns.db.flagExpiring then
-        ns.Print("turn on |cffffd100Also flag buffs about to expire|r first; there is nothing to test while it is off.")
+        ns.Print(L["Turn on |cffffd100%s|r first; there is nothing to test while it is off."]:format(L["Also flag buffs about to expire"]))
         return
     end
     ns.StartExpiryTest()
@@ -812,11 +927,12 @@ local function definePages()
     local active, renderActive = BuildActiveList(page.content)
     local addBox, renderAdd = BuildAddBox(page.content)
     local shareRow, renderShare = BuildShareRow(page.content)
+    local profileRow, renderProfile = BuildProfileRow(page.content)
 
     -- Two clicks rather than a popup: a StaticPopup shown from addon code can hang the client
     -- in Gamepad mode, and this needs no dialog of its own. The first click arms the button
     -- and says so; it disarms itself if the second never comes.
-    local RESET_LABEL = "Reset position and look"
+    local RESET_LABEL = L["Reset position and look"]
     local confirming, armed = false, 0
     local function resetClick()
         if confirming then
@@ -837,107 +953,116 @@ local function definePages()
 
     pages = {
         {
-            key = "buffs", title = "Buffs",
-            desc = "Pick the buffs you care about. A friendly player who is missing one gets its icon beside their nameplate; a fully buffed player shows nothing at all.",
+            key = "buffs", title = L["Buffs"],
+            desc = L["Pick the buffs you care about. A friendly player who is missing one gets its icon beside their nameplate; a fully buffed player shows nothing at all."],
             sections = {
-                { title = "Buffs to flag", key = "flag", rows = {
-                    { kind = "choice", label = "Class",
-                      desc = "Lists every buff this class casts on other players. Tick any number, and switch class to add more: the choices accumulate. It starts on your own class.",
-                      tip = "Hover a buff for its tooltip, at the rank that suits your level.",
+                { title = L["Buffs to flag"], key = "flag", rows = {
+                    { kind = "choice", label = L["Class"],
+                      desc = L["Lists every buff this class casts on other players. Tick any number, and switch class to add more: the choices accumulate. It starts on your own class."],
+                      tip = L["Hover a buff for its tooltip, at the rank that suits your level."],
                       choices = classChoices, get = currentClass, set = function(v) if ns.char then ns.char.browseClass = v end end },
                     { kind = "custom", frame = grid, render = renderGrid },
                 } },
-                { title = function() return "Active buffs (" .. #ns.db.tracked .. ")" end, key = "active", rows = {
+                { title = function() return L["Active buffs (%d)"]:format(#ns.db.tracked) end, key = "active", rows = {
                     { kind = "custom", frame = active, render = renderActive },
                 } },
-                { title = "Add another buff", key = "add", rows = {
+                { title = L["Add another buff"], key = "add", rows = {
                     { kind = "custom", frame = addBox, render = renderAdd },
                 } },
             },
         },
         {
-            key = "look", title = "Look", preview = true,
-            desc = "How the icons look, how they sit together, and where they go on the nameplate. The preview above shows every change as you make it.",
+            key = "look", title = L["Look"], preview = true,
+            desc = L["How the icons look, how they sit together, and where they go on the nameplate. The preview above shows every change as you make it."],
             sections = {
-                { title = "Icons", key = "icons", rows = {
-                    Slider("iconSize", "Icon size", "How big each icon is, in pixels.", 8, 40, 1),
-                    Slider("alpha", "Opacity", "How opaque the icons are. A buff about to expire can fade further; see the Expiring page.", 0.2, 1, 0.05,
+                { title = L["Icons"], key = "icons", rows = {
+                    Slider("iconSize", L["Icon size"], L["How big each icon is, in pixels."], 8, 40, 1),
+                    Slider("alpha", L["Opacity"], L["How opaque the icons are. A buff about to expire can fade further; see the Expiring page."], 0.2, 1, 0.05,
                         { fmt = function(v) return ("%d%%"):format(math.floor(v * 100 + 0.5)) end }),
-                    Choice("layout", "Layout", "How several missing buffs sit side by side. Overlapped lets each icon cover the edge of the last.",
+                    Choice("layout", L["Layout"], L["How several missing buffs sit side by side. Overlapped lets each icon cover the edge of the last."],
                         Choices(ns.LAYOUTS)),
-                    Slider("spacing", "Spacing", "The gap between icons, in pixels.", 0, 12, 1,
+                    Slider("spacing", L["Spacing"], L["The gap between icons, in pixels."], 0, 12, 1,
                         { vis = function() return ns.db.layout ~= "OVERLAP" end }),
-                    Slider("maxIcons", "Most icons shown",
-                        "The most things drawn at once. When more buffs are missing than that, the last slot becomes a red +N chip standing for the rest. All the way up means no limit.",
+                    Slider("maxIcons", L["Most icons shown"],
+                        L["The most things drawn at once. When more buffs are missing than that, the last slot becomes a red +N chip standing for the rest. All the way up means no limit."],
                         ns.MIN_ICON_LIMIT, ns.NO_ICON_LIMIT, 1,
                         { fmt = function(v) return v >= ns.NO_ICON_LIMIT and "No limit" or tostring(v) end }),
                 } },
-                { title = "Style", key = "style", rows = {
-                    Choice("iconStyle", "Icon style",
-                        "Square is the stock spell icon. Round clips it to a circle. Gold ring puts a ring round the round icon. The round styles use Blizzard's own circle art.",
+                { title = L["Style"], key = "style", rows = {
+                    Choice("iconStyle", L["Icon style"],
+                        L["Square is the stock spell icon. Round clips it to a circle. Gold ring puts a ring round the round icon. The round styles use Blizzard's own circle art."],
                         Choices(ns.ICON_STYLES, ns.IconStyleSupported)),
-                    Choice("ringColor", "Ring color",
-                        "Plain gold, or the color of the class that casts the buff (white for a Priest's buff, orange for a Druid's) so you can tell who to ask. A buff you added by name has no known class and keeps the gold ring.",
+                    Choice("ringColor", L["Ring color"],
+                        L["Plain gold, or the color of the class that casts the buff (white for a Priest's buff, orange for a Druid's) so you can tell who to ask. A buff you added by name has no known class and keeps the gold ring."],
                         Choices(ns.RING_COLORS), { vis = isRing }),
-                    Toggle("outline", "Black outline",
-                        "A black outline along the icon's edge, so it stands out against a busy background. It is laid over the icon's edge, so the art keeps its size and only its outermost pixels are covered. The gold ring has an edge of its own.",
+                    Toggle("outline", L["Black outline"],
+                        L["A black outline along the icon's edge, so it stands out against a busy background. It is laid over the icon's edge, so the art keeps its size and only its outermost pixels are covered. The gold ring has an edge of its own."],
                         { vis = hasOutline }),
-                    Slider("outlineSize", "Outline thickness", "How thick the outline is, in pixels. A small icon holds it to a quarter of its size.", 1, 4, 1,
+                    Slider("outlineSize", L["Outline thickness"], L["How thick the outline is, in pixels. A small icon holds it to a quarter of its size."], 1, 4, 1,
                         { vis = outlineOn }),
-                    Slider("iconZoom", "Icon zoom",
-                        "Crops into the icon art. At 0% you see the whole texture, Blizzard's own border included; higher values magnify the middle. It does not change the icon's size.",
+                    Slider("iconZoom", L["Icon zoom"],
+                        L["Crops into the icon art. At 0% you see the whole texture, Blizzard's own border included; higher values magnify the middle. It does not change the icon's size."],
                         0, ns.MAX_ZOOM, 1, { fmt = function(v) return v .. "%" end }),
                 } },
-                { title = "Position", key = "position", rows = {
-                    Choice("anchor", "Anchor", function()
+                { title = L["Position"], key = "position", rows = {
+                    Choice("anchor", L["Anchor"], function()
                         for _, a in ipairs(ns.ANCHORS) do if a.key == ns.db.anchor then return a.help end end
                     end, Choices(ns.ANCHORS)),
-                    Slider("xOffset", "Horizontal offset", "How far right (or left, below zero) of the plate's centre the icons sit.", -200, 200, 1, { vis = custom }),
-                    Slider("yOffset", "Vertical offset", "How far above (or below, under zero) the plate's centre the icons sit.", -100, 100, 1, { vis = custom }),
+                    Slider("xOffset", L["Horizontal offset"], L["How far right (or left, below zero) of the plate's centre the icons sit."], -200, 200, 1, { vis = custom }),
+                    Slider("yOffset", L["Vertical offset"], L["How far above (or below, under zero) the plate's centre the icons sit."], -100, 100, 1, { vis = custom }),
                 } },
             },
         },
         {
-            key = "expiring", title = "Expiring", preview = true,
-            desc = "A buff that is about to run out can be flagged too, with the minutes left on it, so it reads differently from one that was never cast.",
+            key = "expiring", title = L["Expiring"], preview = true,
+            desc = L["A buff that is about to run out can be flagged too, with the minutes left on it, so it reads differently from one that was never cast."],
             sections = {
-                { title = "Buffs about to expire", key = "expiring", rows = {
-                    Toggle("flagExpiring", "Also flag buffs about to expire",
-                        "Keeps the icon showing, with the minutes left on it, once a buff drops below the threshold. A buff whose remaining time this client won't report is never flagged.",
-                        { tip = "Press Test expiring look in the preview to see it without waiting." }),
-                    Slider("expiringMinutes", "Warn under (minutes)", "How little time must be left before the buff is flagged.", 1, 30, 1, { vis = flagging }),
-                    Choice("expireStyle", "Show them as",
-                        "Amber tint turns the icon amber. Faded icon makes it more transparent instead. Countdown sweep leaves the icon alone and darkens it like a clock as time runs out, with the label turning amber, then orange under two minutes and red under one.",
+                { title = L["Buffs about to expire"], key = "expiring", rows = {
+                    Toggle("flagExpiring", L["Also flag buffs about to expire"],
+                        L["Keeps the icon showing, with the minutes left on it, once a buff drops below the threshold. A buff whose remaining time this client won't report is never flagged."],
+                        { tip = L["Press %s in the preview to see it without waiting."]:format(L["Test expiring look"]) }),
+                    Slider("expiringMinutes", L["Warn under (minutes)"], L["How little time must be left before the buff is flagged."], 1, 30, 1, { vis = flagging }),
+                    Choice("expireStyle", L["Show them as"],
+                        L["Amber tint turns the icon amber. Faded icon makes it more transparent instead. Countdown sweep leaves the icon alone and darkens it like a clock as time runs out, with the label turning amber, then orange under two minutes and red under one."],
                         Choices(ns.EXPIRE_STYLES), { vis = flagging }),
-                    Slider("expireAlpha", "Faded opacity", "How opaque a faded icon is. Only the icon fades: the minutes label stays fully readable.", 10, 100, 5,
+                    Slider("expireAlpha", L["Faded opacity"], L["How opaque a faded icon is. Only the icon fades: the minutes label stays fully readable."], 10, 100, 5,
                         { fmt = function(v) return v .. "%" end,
                           vis = function() return flagging() and ns.db.expireStyle == "FADE" end }),
                 } },
             },
         },
         {
-            key = "share", title = "Share",
-            desc = "Send your list of tracked buffs to another player who has Unbuffed. They are asked first, and only buffs they don't already track are added.",
+            key = "share", title = L["Share"],
+            desc = L["Send your list of tracked buffs to another player who has Unbuffed. They are asked first, and only buffs they don't already track are added."],
             sections = {
-                { title = "Send your buffs", key = "send", rows = {
+                { title = L["Send your buffs"], key = "send", rows = {
                     { kind = "custom", frame = shareRow, render = renderShare },
                 } },
-                { title = "Receiving", key = "receive", rows = {
-                    Toggle("shareReceive", "Let other players offer me their buffs",
-                        "When someone offers to share their buffs you get an Accept / Decline prompt. Nothing arrives unless you accept, and only buffs you don't already track are added. Off declines every offer."),
+                { title = L["Receiving"], key = "receive", rows = {
+                    Toggle("shareReceive", L["Let other players offer me their buffs"],
+                        L["When someone offers to share their buffs you get an Accept / Decline prompt. Nothing arrives unless you accept, and only buffs you don't already track are added. Off declines every offer."]),
                 } },
             },
         },
         {
-            key = "general", title = "General",
-            desc = "Who gets an icon, and putting the look back the way it was.",
+            key = "profile", title = L["Profile"],
+            desc = L["Copy your whole setup as one piece of text, and paste it on another character or another install. It holds every setting on every page, and this character's buff list."],
             sections = {
-                { title = "General", key = "general", rows = {
-                    Toggle("hideSelf", "Skip my own nameplate", "Leaves the personal resource display alone."),
-                    Toggle("groupOnly", "Only show for party and raid members",
-                        "Skips everyone who is not in your party or raid, so strangers' plates never get an icon. With this on and no group, nothing is shown. Your own plate is covered by the option above."),
-                    Button("Reset position and look", "Puts the position, size, opacity, style, layout and expiry settings back to their defaults. Which buffs you track and who is flagged are left alone.",
-                        function() return confirming and "|cffff5555Click again to confirm|r" or RESET_LABEL end, resetClick),
+                { title = L["Export and import"], key = "profile", rows = {
+                    { kind = "custom", frame = profileRow, render = renderProfile },
+                } },
+            },
+        },
+        {
+            key = "general", title = L["General"],
+            desc = L["Who gets an icon, and putting the look back the way it was."],
+            sections = {
+                { title = L["General"], key = "general", rows = {
+                    Toggle("hideSelf", L["Skip my own nameplate"], L["Leaves the personal resource display alone."]),
+                    Toggle("groupOnly", L["Only show for party and raid members"],
+                        L["Skips everyone who is not in your party or raid, so strangers' plates never get an icon. With this on and no group, nothing is shown. Your own plate is covered by the option above."]),
+                    Button(L["Reset position and look"], L["Puts the position, size, opacity, style, layout and expiry settings back to their defaults. Which buffs you track and who is flagged are left alone."],
+                        function() return confirming and ("|cffff5555" .. L["Click again to confirm"] .. "|r") or RESET_LABEL end, resetClick),
                 } },
             },
         },
@@ -1173,7 +1298,7 @@ local function BuildWindow()
     leftLine:SetPoint("TOPLEFT", left, "TOPRIGHT"); leftLine:SetPoint("BOTTOMLEFT", left, "BOTTOMRIGHT")
 
     local y = -PAD + 4
-    for _, key in ipairs({ "buffs", "look", "expiring", "share", "general" }) do
+    for _, key in ipairs({ "buffs", "look", "expiring", "share", "profile", "general" }) do
         local b = CreateFrame("Button", nil, left)
         b:SetSize(LEFT_W - 2 * PAD, 24)
         b:SetPoint("TOPLEFT", PAD, y)
@@ -1184,6 +1309,8 @@ local function BuildWindow()
         b:GetHighlightTexture():SetAlpha(0.25)
         b.text = Text(b, "GameFontHighlight")
         b.text:SetPoint("LEFT", 8, 0)
+        b.text:SetWidth(LEFT_W - 2 * PAD - 12)
+        b.text:SetWordWrap(false)
         b:SetScript("OnClick", function()
             Sound("IG_CHARACTER_INFO_TAB")
             Panel.Select(key)
@@ -1274,11 +1401,11 @@ local stub = CreateFrame("Frame")
 stub.name = "Unbuffed"
 local stubText = stub:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 stubText:SetPoint("TOPLEFT", 16, -16)
-stubText:SetText("Unbuffed has its own settings window.")
+stubText:SetText(L["Unbuffed has its own settings window."])
 local stubButton = CreateFrame("Button", nil, stub, "UIPanelButtonTemplate")
 stubButton:SetSize(190, 24)
 stubButton:SetPoint("TOPLEFT", 16, -46)
-stubButton:SetText("Open Unbuffed settings")
+stubButton:SetText(L["Open Unbuffed settings"])
 stubButton:SetScript("OnClick", function()
     if SettingsPanel and SettingsPanel.IsShown and SettingsPanel:IsShown() and HideUIPanel then
         pcall(HideUIPanel, SettingsPanel)
@@ -1315,7 +1442,7 @@ SlashCmdList.UNBUFFED = function(msg)
         ns.AddTracked(entry)
         ns.RefreshAll()
         ns.RefreshOptions()
-        ns.Print("now flagging |cffffd100" .. entry.label .. "|r.")
+        ns.Print(L["now flagging |cffffd100%s|r."]:format(entry.label))
     elseif cmd == "remove" or cmd == "rem" then
         local target = rest:lower()
         for _, e in ipairs(ns.db.tracked) do
@@ -1323,28 +1450,31 @@ SlashCmdList.UNBUFFED = function(msg)
                 ns.RemoveTracked(e.key)
                 ns.RefreshAll()
                 ns.RefreshOptions()
-                ns.Print("stopped flagging |cffffd100" .. e.label .. "|r.")
+                ns.Print(L["stopped flagging |cffffd100%s|r."]:format(e.label))
                 return
             end
         end
-        ns.Print("not tracking anything called '" .. rest .. "'.")
+        ns.Print(L["not tracking anything called '%s'."]:format(rest))
     elseif cmd == "test" then
         ns.RunExpiryTest()
+    elseif cmd == "export" or cmd == "import" then
+        ns.ShowOptionsPage("profile")
+        if cmd == "export" then ns.profileUI.export() else ns.profileUI.focus() end
     elseif cmd == "share" then
         if rest == "" then
             ns.ShowOptionsPage("share")
         else
             local ok, err = ns.SendBuffs(rest)
-            if not ok then ns.Print(err) else ns.Print("offered your buffs to " .. rest .. "; they are asked first.") end
+            if not ok then ns.Print(err) else ns.Print(L["offered your buffs to %s; they are asked first."]:format(rest)) end
         end
     elseif cmd == "list" then
-        if #ns.db.tracked == 0 then ns.Print("nothing tracked."); return end
-        ns.Print("tracking:")
+        if #ns.db.tracked == 0 then ns.Print(L["nothing tracked."]); return end
+        ns.Print(L["tracking:"])
         for _, e in ipairs(ns.db.tracked) do
-            print("   - " .. e.label .. (e.enabled and "" or " |cff888888(off)|r")
+            print("   - " .. chipLabel(e) .. (e.enabled and "" or (" |cff888888" .. L["(off)"] .. "|r"))
                 .. "  |cff888888[" .. table.concat(e.names, " / ") .. "]|r")
         end
     else
-        ns.Print("/ub  |cff888888(settings)|r  ·  add <name|id>  ·  remove <name>  ·  list  ·  test  ·  share [name]")
+        ns.Print(L["/ub  |cff888888(settings)|r  ·  add <name|id>  ·  remove <name>  ·  list  ·  test  ·  share [name]  ·  export  ·  import"])
     end
 end

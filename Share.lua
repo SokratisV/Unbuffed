@@ -1,4 +1,5 @@
 local ADDON, ns = ...
+local L = ns.L
 
 -- Sharing your buff list with another player, in the way Thumber (same author) shares its marks:
 -- a whisper transfer over addon messages. The other player is asked first (Accept / Decline),
@@ -100,11 +101,13 @@ end
 -- What goes across
 --------------------------------------------------------------------------
 -- The enabled buffs as one text block, and how many there are. Listed buffs go by key; the rest by
--- the id or the name they were added with. Anything else is left out.
-local function Serialize()
+-- the id or the name they were added with. Anything else is left out. The whisper transfer uses this
+-- form, and it must not change. A profile export passes `all` to include the switched-off buffs too,
+-- each with a third column that says whether it is on.
+local function Serialize(all)
     local lines, n = { "UNBUFFED" .. VERSION }, 0
     for _, e in ipairs(ns.db.tracked) do
-        if e.enabled and n < MAX_ENTRIES and type(e.key) == "string" then
+        if (e.enabled or all) and n < MAX_ENTRIES and type(e.key) == "string" then
             local line
             if ns.FindPreset(e.key) then
                 line = "p\t" .. Esc(e.key)
@@ -115,7 +118,7 @@ local function Serialize()
             end
             if line then
                 n = n + 1
-                lines[#lines + 1] = line
+                lines[#lines + 1] = all and (line .. "\t" .. (e.enabled and "1" or "0")) or line
             end
         end
     end
@@ -125,7 +128,7 @@ end
 -- A text block back into a validated list of { kind, value }, or nil and a reason.
 local function ParsePayload(raw)
     local lines = Split(raw, "\n")
-    if lines[1] ~= "UNBUFFED" .. VERSION then return nil, "that was made by a different version of Unbuffed" end
+    if lines[1] ~= "UNBUFFED" .. VERSION then return nil, L["That was made by a different version of Unbuffed."] end
     local entries, seen = {}, {}
     for i = 2, #lines do
         if lines[i] ~= "" and #entries < MAX_ENTRIES then
@@ -145,7 +148,7 @@ local function ParsePayload(raw)
             local id = kind .. ":" .. tostring(value)
             if ok and not seen[id] then
                 seen[id] = true
-                entries[#entries + 1] = { kind = kind, value = value }
+                entries[#entries + 1] = { kind = kind, value = value, enabled = f[3] ~= "0" }
             end
         end
     end
@@ -155,16 +158,21 @@ end
 -- Add what the list does not have, and nothing else. Returns how many were added, how many were
 -- already tracked, and how many this client cannot use (a TBC-only buff on Forever, a spell id it
 -- does not know). An existing entry is never touched, even if it is switched off.
+-- The tracked entry for one parsed item, built from this client's own tables, or nil if this client
+-- cannot have it.
+local function BuildEntry(ent)
+    if ent.kind == "p" then
+        local preset = ns.FindPreset(ent.value)
+        if preset and ns.PresetAvailable(preset) then return ns.PresetEntry(preset) end
+        return nil
+    end
+    return (ns.EntryFromInput(ent.kind == "i" and tostring(ent.value) or ent.value))
+end
+
 local function Apply(entries)
     local added, had, skipped = 0, 0, 0
     for _, ent in ipairs(entries) do
-        local built
-        if ent.kind == "p" then
-            local preset = ns.FindPreset(ent.value)
-            if preset and ns.PresetAvailable(preset) then built = ns.PresetEntry(preset) end
-        else
-            built = ns.EntryFromInput(ent.kind == "i" and tostring(ent.value) or ent.value)
-        end
+        local built = BuildEntry(ent)
         if not built then
             skipped = skipped + 1
         elseif ns.FindTracked(built.key) then
@@ -179,7 +187,10 @@ local function Apply(entries)
     return added, had, skipped
 end
 
-ns.Share = { B64Encode = B64Encode, B64Decode = B64Decode, Serialize = Serialize, Parse = ParsePayload, Apply = Apply }
+ns.Share = {
+    B64Encode = B64Encode, B64Decode = B64Decode, Serialize = Serialize, Parse = ParsePayload, Apply = Apply,
+    BuildEntry = BuildEntry, Esc = Esc, Unesc = Unesc, Split = Split, Clean = Clean,   -- shared with Profile.lua
+}
 
 --------------------------------------------------------------------------
 -- Naming a player, as the game wants it
@@ -270,19 +281,19 @@ local function Pump(o)
     if out ~= o then return end
     local chunk = o.chunks[o.idx + 1]
     if not chunk then
-        Status(("Sent %d buffs to %s."):format(o.count, o.target))
-        Print(("sent %d buffs to %s."):format(o.count, o.target))
+        Status((L["Sent %d buffs to %s."]):format(o.count, o.target))
+        Print((L["sent %d buffs to %s."]):format(o.count, o.target))
         out = nil
         return
     end
     local ok, res = SendMsg(("C:%s:%d:%s"):format(o.id, o.idx + 1, chunk), o.target)
     if ok then
         o.idx, o.tries = o.idx + 1, 0
-        Status(("Sending to %s... %d / %d"):format(o.target, o.idx, #o.chunks))
+        Status((L["Sending to %s... %d / %d"]):format(o.target, o.idx, #o.chunks))
     else
         o.tries = (o.tries or 0) + 1
         if not (res and RETRY_RESULTS[res]) or o.tries > 5 then
-            Status("Sending stopped: the game wouldn't take the messages. Try again in a moment.")
+            Status(L["Sending stopped: the game wouldn't take the messages. Try again in a moment."])
             out = nil
             return
         end
@@ -293,27 +304,27 @@ end
 -- Offer your buffs to `target`; the transfer starts when they accept. Returns true, or false and why.
 function ns.SendBuffs(target)
     target = NormalizeName(target or "")
-    if target == "" then return false, "Type a player's name first." end
+    if target == "" then return false, L["Type a player's name first."] end
     local me = UnitKey("player")
-    if me and SameName(me, target) then return false, "That's you." end
+    if me and SameName(me, target) then return false, L["That's you."] end
     local payload, count = Serialize()
-    if count == 0 then return false, "You aren't tracking any buffs to share." end
-    if out then return false, "A transfer is already under way." end
+    if count == 0 then return false, L["You aren't tracking any buffs to share."] end
+    if out then return false, L["A transfer is already under way."] end
     local data = B64Encode(payload)
     local chunks = {}
     for i = 1, #data, CHUNK do chunks[#chunks + 1] = data:sub(i, i + CHUNK - 1) end
-    if #chunks > MAX_CHUNKS then return false, "That's too many buffs to send." end
+    if #chunks > MAX_CHUNKS then return false, L["That's too many buffs to send."] end
 
     local id = ("%06x"):format(math.random(0, 0xFFFFFF))
     local ok = SendMsg(("O:%s:%d:%d"):format(id, #chunks, count), target)
-    if not ok then return false, "Couldn't send anything to " .. target .. "." end
+    if not ok then return false, L["Couldn't send anything to %s."]:format(target) end
     local o = { id = id, target = target, chunks = chunks, idx = 0, count = count }
     out = o
-    Status(("Waiting for %s to accept %d buffs..."):format(target, count))
+    Status((L["Waiting for %s to accept %d buffs..."]):format(target, count))
     C_Timer.After(OFFER_WAIT, function()
         if out == o and not o.sending then
             out = nil
-            Status(("No answer from %s. They may be offline, not have Unbuffed, or have said no."):format(target))
+            Status((L["No answer from %s. They may be offline, not have Unbuffed, or have said no."]):format(target))
         end
     end)
     return true
@@ -326,7 +337,7 @@ local function Watch(i)
     C_Timer.After(10, function()
         if inc ~= i then return end
         if GetTime() - i.last > 40 then
-            Print(("the transfer from %s timed out."):format(i.sender))
+            Print((L["the transfer from %s timed out."]):format(i.sender))
             inc = nil
         else
             Watch(i)
@@ -340,16 +351,13 @@ local function Finish(i)
     for n = 1, i.total do parts[n] = i.got[n] end
     local raw = B64Decode(table.concat(parts))
     local entries, err
-    if raw then entries, err = ParsePayload(raw) else err = "the data was damaged" end
+    if raw then entries, err = ParsePayload(raw) else err = L["The data was damaged."] end
     if not entries then
-        Print(("what %s sent couldn't be read: %s."):format(i.sender, err or "damaged data"))
+        Print(L["What %s sent couldn't be read."]:format(i.sender) .. " " .. (err or L["The data was damaged."]))
         return
     end
     local added, had, skipped = Apply(entries)
-    local msg = ("received %d buffs from %s: %d new"):format(#entries, i.sender, added)
-    if had > 0 then msg = msg .. (", %d you already track"):format(had) end
-    if skipped > 0 then msg = msg .. (", %d this client can't use"):format(skipped) end
-    Print(msg .. ".")
+    Print(L["Received %d buffs from %s: %d new, %d you already track, %d this client can't use."]:format(#entries, i.sender, added, had, skipped))
 end
 
 local function Decline(o, reason)
@@ -363,7 +371,7 @@ local function Accept(o)
     local i = { id = o.id, sender = o.sender, total = o.total, count = o.count, got = {}, n = 0, last = GetTime() }
     inc = i
     SendMsg("A:" .. o.id, o.sender)
-    Print(("receiving %d buffs from %s..."):format(o.count, o.sender))
+    Print((L["receiving %d buffs from %s..."]):format(o.count, o.sender))
     Watch(i)
 end
 
@@ -391,18 +399,18 @@ local function ShowOffer(o)
         f.text:SetJustifyH("CENTER")
         local function button(text, x, onClick)
             local b = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-            b:SetSize(110, 22)
+            b:SetSize(130, 22)
             b:SetPoint("TOPLEFT", x, -68)
             b:SetText(text)
             b:SetScript("OnClick", onClick)
             return b
         end
-        f.accept = button("Accept", 70, function()
+        f.accept = button(L["Accept"], 40, function()
             local cur = f.offer
             f:Hide()
             if cur then Accept(cur) end
         end)
-        f.decline = button("Decline", 200, function()
+        f.decline = button(L["Decline"], 210, function()
             local cur = f.offer
             f:Hide()
             if cur and offer == cur then Decline(cur) end
@@ -410,7 +418,7 @@ local function ShowOffer(o)
         offerFrame = f
     end
     f.offer = o
-    f.text:SetText(("|cffffd100%s|r wants to share %d Unbuffed buffs with you.\nYour own list is kept; only new buffs are added."):format(o.sender, o.count))
+    f.text:SetText((L["|cffffd100%s|r wants to share %d Unbuffed buffs with you.\nYour own list is kept; only new buffs are added."]):format(o.sender, o.count))
     f:Show()
     C_Timer.After(OFFER_SHOWN, function()
         if f.offer == o and offer == o then
@@ -436,8 +444,8 @@ local function OnOffer(sender, rest)
 end
 
 local DECLINED = {
-    busy = "is busy with another transfer", off = "isn't accepting shared buffs",
-    size = "can't take that many buffs",
+    busy = L["%s is busy with another transfer."], off = L["%s isn't accepting shared buffs."],
+    size = L["%s can't take that many buffs."],
 }
 
 local function OnMessage(prefix, text, _, sender)
@@ -449,13 +457,13 @@ local function OnMessage(prefix, text, _, sender)
     elseif kind == "A" then
         if out and out.id == rest and not out.sending and SameName(sender, out.target) then
             out.sending = true
-            Status(("%s accepted. Sending..."):format(out.target))
+            Status((L["%s accepted. Sending..."]):format(out.target))
             Pump(out)
         end
     elseif kind == "D" then
         local id, reason = rest:match("^(%x+):(%a*)$")
         if out and out.id == id and SameName(sender, out.target) then
-            Status(("%s %s."):format(out.target, DECLINED[reason] or "said no"))
+            Status((DECLINED[reason] or L["%s said no."]):format(out.target))
             out = nil
         end
     elseif kind == "C" then

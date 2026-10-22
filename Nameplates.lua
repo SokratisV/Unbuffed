@@ -1,4 +1,5 @@
 local ADDON, ns = ...
+local L = ns.L
 
 -- The icon row that hangs off a friendly player's nameplate.
 --
@@ -429,10 +430,10 @@ function ns.RenderRow(row, items, count, db, opts)
                     fs:SetPoint("BOTTOMRIGHT", t, "BOTTOMRIGHT", 2, -2)
                 end
                 if sweep then
-                    fs:SetText(left < 60 and (math.max(1, math.ceil(left)) .. "s") or (math.ceil(left / 60) .. "m"))
+                    fs:SetText(left < 60 and L["%ds"]:format(math.max(1, math.ceil(left))) or L["%dm"]:format(math.ceil(left / 60)))
                     fs:SetTextColor(ns.UrgencyColor(left))
                 else
-                    fs:SetText(math.max(1, math.ceil(left / 60)) .. "m")
+                    fs:SetText(L["%dm"]:format(math.max(1, math.ceil(left / 60))))
                     fs:SetTextColor(1, 1, 1)
                 end
                 fs:SetAlpha(1)   -- only the icon fades, never the timer beside it

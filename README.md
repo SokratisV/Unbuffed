@@ -25,6 +25,7 @@ buffed player shows nothing at all, so every icon you can see is something to ca
 - `/ub remove <name>`, `/ub list`.
 - `/ub test` runs the expiring-buff look for 20 seconds, so you can see it.
 - `/ub share [name]` sends your buff list to another player, or opens the Share page.
+- `/ub export` and `/ub import` open the Profile page, to copy your whole setup or paste one in.
 
 ## Choosing buffs
 
@@ -92,6 +93,21 @@ names and icon, and one that doesn't exist on their client (a TBC-only buff on W
 and reported. A buff you added by name or spell ID is sent as that name or ID. Anything that arrives is
 checked and size-capped. **Let other players offer me their buffs** on the same page turns offers off
 (they are declined for you). Transfers go in small paced messages, the same way Thumber shares its marks.
+
+## Profiles: copy your setup
+
+The **Profile** page (or `/ub export`, `/ub import`) turns your whole setup into one piece of text you can
+copy, and reads it back on another character or another install. It holds **every setting on every
+page** -- where the icons go (anchor and offsets), their size, style, ring color, outline, zoom,
+layout and cap, the expiring look, and the filters -- and **this character's buff list**, switched-off
+buffs included. Another character's list, and which page the window was on, are not part of it.
+
+Press **Export** and copy the text from the box. To use one, paste it and press **Preview import**, which
+says how many settings differ from yours; then **Import everything** replaces your settings and this
+character's buff list, and **Import settings only** leaves the buff list alone. It applies at once, with
+no reload. A setting the text doesn't mention takes its default, a value that isn't allowed is held to
+what the setting allows or dropped, and anything that isn't an Unbuffed profile, or was made by a
+different version, is refused with a plain message rather than an error.
 
 ## Who gets an icon
 
@@ -195,6 +211,26 @@ Fortitude** is not missing Fortitude.
 Adding a buff by spell ID stores the ID *and* its name. The ID is the form that keeps
 working during combat (see below); the name is what makes it rank-proof. A spell ID is
 only ever used to prove a buff is **present** — never that it is absent.
+
+### On a client in another language
+
+Aura names are whatever the client calls them, so on a German, French or other non-English client the
+English names alone would never match. Unbuffed asks the client what the buff's spell and its group
+spell are called -- Power Word: Fortitude and Prayer of Fortitude, Greater Blessing of Might -- and
+matches those too, keeping the English names as a fallback, and the list shows each buff by the client's
+own spell name. This covers every listed buff **except the Shaman's totem buffs and the Warlock's
+Soulstone**, whose aura is a different spell from the one cast, so there is no spell ID to ask about:
+on a client in another language, add those by the name the buff shows in the game (a buff added by
+name is matched by exactly what you typed).
+
+## Languages
+
+The settings window, the chat messages, the buff list's own text and the AddOns-list description are
+translated into **German, French, Spanish (Spain and Latin America), Brazilian Portuguese, Russian,
+Korean, Simplified and Traditional Chinese, and Italian**. English is the fallback for any text that has
+no translation. Spell names, tooltips and class names always come from the game, so they read in
+your language already; the slash commands stay English. The text tables are in `Locales/`, one file per
+client language.
 
 ## What the client will and won't tell an addon
 

@@ -94,7 +94,7 @@ end
 --   false = definitely missing
 --   nil   = couldn't tell
 function ns.HasBuff(unit, entry)
-    local ids, names = entry.ids, entry.names
+    local ids, names = entry.ids, ns.MatchNames(entry)
 
     -- 1. By spell id. This is the form that survives combat, but note what it can
     --    and cannot prove: on Vanilla-era content a buff is a family of per-rank

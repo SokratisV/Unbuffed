@@ -1,4 +1,5 @@
 local ADDON, ns = ...
+local L = ns.L
 
 -- Unbuffed -- flags friendly player nameplates that are MISSING the buffs you track.
 -- A player who has everything shows nothing; one who is missing something gets a
@@ -110,17 +111,17 @@ ns.defaults = {
 -- How each icon is drawn, in the order the panel lists them. SQUARE is the stock
 -- spell icon; RING, the default, is a round icon in a gold ring.
 ns.ICON_STYLES = {
-    { key = "SQUARE", label = "Square" },
-    { key = "ROUND",  label = "Round" },
-    { key = "RING",   label = "Gold ring" },
+    { key = "SQUARE", label = L["Square"] },
+    { key = "ROUND",  label = L["Round"] },
+    { key = "RING",   label = L["Gold ring"] },
 }
 
 -- How an icon about to expire is told apart from one that was never cast. Only the
 -- icon changes; the minutes-left label beside it always stays fully opaque.
 ns.EXPIRE_STYLES = {
-    { key = "TINT",  label = "Amber tint" },
-    { key = "FADE",  label = "Faded icon" },
-    { key = "SWEEP", label = "Countdown sweep" },
+    { key = "TINT",  label = L["Amber tint"] },
+    { key = "FADE",  label = L["Faded icon"] },
+    { key = "SWEEP", label = L["Countdown sweep"] },
 }
 
 -- The most the icon art can be zoomed in, in percent cropped from each edge. Past this the icon is
@@ -134,27 +135,27 @@ ns.MIN_ICON_LIMIT = 2
 
 -- How several missing buffs sit side by side. OVERLAP ignores the spacing setting.
 ns.LAYOUTS = {
-    { key = "ROW",     label = "Row" },
-    { key = "OVERLAP", label = "Overlapped" },
+    { key = "ROW",     label = L["Row"] },
+    { key = "OVERLAP", label = L["Overlapped"] },
 }
 
 -- What colour the ring of the RING style is.
 ns.RING_COLORS = {
-    { key = "GOLD",  label = "Gold" },
-    { key = "CLASS", label = "Class of the buff" },
+    { key = "GOLD",  label = L["Gold"] },
+    { key = "CLASS", label = L["Class of the buff"] },
 }
 
 -- The anchor choices, in the order the panel lists them. `help` is the line the panel
 -- shows under the dropdown; nothing else reads it.
 ns.ANCHORS = {
-    { key = "LEVEL_RIGHT", label = "Right of the level text",
-      help = "Just past the level number. A plate with no level box falls back to the right end of its health bar." },
-    { key = "BAR_LEFT",    label = "Left of the health bar",
-      help = "Against the left end of the health bar." },
-    { key = "BAR_BELOW",   label = "Centered under the health bar",
-      help = "Centered beneath the health bar." },
-    { key = "CUSTOM",      label = "Custom",
-      help = "Measured from the centre of the nameplate. Set the offsets below." },
+    { key = "LEVEL_RIGHT", label = L["Right of the level text"],
+      help = L["Just past the level number. A plate with no level box falls back to the right end of its health bar."] },
+    { key = "BAR_LEFT",    label = L["Left of the health bar"],
+      help = L["Against the left end of the health bar."] },
+    { key = "BAR_BELOW",   label = L["Centered under the health bar"],
+      help = L["Centered beneath the health bar."] },
+    { key = "CUSTOM",      label = L["Custom"],
+      help = L["Measured from the centre of the nameplate. Set the offsets below."] },
 }
 
 local function copyDefaults(src, dst)
@@ -207,13 +208,13 @@ end
 -- is the one that survives combat on Midnight, while the name path is the one that
 -- matches every rank. Wanting both is why an entry carries both.
 function ns.EntryFromInput(input)
-    if not input or input == "" then return nil, "nothing to add" end
+    if not input or input == "" then return nil, L["nothing to add"] end
 
     local id = tonumber(input)
     if id then
         local name, icon = ns.SpellNameAndIcon(id)
         if not name then
-            return nil, ("no spell with id %d on this client"):format(id)
+            return nil, (L["no spell with id %d on this client"]):format(id)
         end
         return { key = "spell:" .. id, label = name, icon = icon, names = { name }, ids = { id } }
     end
@@ -350,7 +351,7 @@ ns.On("PLAYER_LOGIN", function()
     ns.AttachCharacter()
     if not ns.char.greeted and #ns.db.tracked == 0 then
         ns.char.greeted = true
-        ns.Print("nothing is being tracked yet -- open |cffffd100/unbuffed|r and tick the buffs you want flagged.")
+        ns.Print(L["nothing is being tracked yet -- open |cffffd100/unbuffed|r and tick the buffs you want flagged."])
     end
     -- The addon draws on friendly player nameplates, so it is invisible while the
     -- client isn't showing any. Worth saying once rather than looking broken.
@@ -361,6 +362,7 @@ end)
 local function spellsChanged()
     if not ns.attached then return end
     ns.ResetKnown()
+    ns.ResetMatchNames()
     ns.ApplyMains()
     if ns.RefreshAll then ns.RefreshAll() end
     if ns.RefreshOptions then ns.RefreshOptions() end
@@ -381,7 +383,7 @@ function ns.CheckNameplateCVar()
         local ok, on = pcall(get, cvar)
         if ok and type(on) == "boolean" then
             if not on then
-                ns.Print("friendly player nameplates are turned off, so nothing will show. Enable them in Interface options, or run |cffffd100/run C_CVar.SetCVar(\"" .. cvar .. "\", \"1\")|r")
+                ns.Print(L["Friendly player nameplates are turned off, so nothing will show. Enable them in Interface options, or run |cffffd100/run C_CVar.SetCVar(\"%s\", \"1\")|r"]:format(cvar))
             end
             return
         end

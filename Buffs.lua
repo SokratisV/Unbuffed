@@ -20,13 +20,19 @@ local ADDON, ns = ...
 --
 -- `pet` marks a buff that is cast by a pet, so it is never in the player's own spellbook.
 --
+-- `gid` is the spell id of the group version (Prayer of Fortitude, Greater Blessing of Might ...). `names` is
+-- English, and the aura on a player is called what the CLIENT calls it, so ns.MatchNames asks the client what
+-- `id` and `gid` are called and matches that as well. Where the buff's aura is a different spell from the one
+-- cast (a Shaman's totems, the Warlock's Soulstone) there is no id here to ask about, so those match by their
+-- English names alone and, on a client in another language, need adding by name.
+--
 -- Icons are literal for the nine buffs that shipped before this list was organised by
 -- class, so they stay exactly as they were. The keys of those nine are also what saved
 -- profiles refer to: never rename one.
 ns.CLASS_BUFFS = {
     DRUID = {
         { key = "motw",   label = "Mark of the Wild", icon = "Interface\\Icons\\Spell_Nature_Regeneration",
-          names = { "Mark of the Wild", "Gift of the Wild" }, id = 1126 },
+          names = { "Mark of the Wild", "Gift of the Wild" }, id = 1126, gid = 21849 },
         { key = "thorns", label = "Thorns",           icon = "Interface\\Icons\\Spell_Nature_Thorns",
           names = { "Thorns" }, id = 467 },
     },
@@ -37,23 +43,23 @@ ns.CLASS_BUFFS = {
     },
     MAGE = {
         { key = "intellect", label = "Arcane Intellect", icon = "Interface\\Icons\\Spell_Holy_MagicalSentry",
-          names = { "Arcane Intellect", "Arcane Brilliance" }, id = 1459 },
+          names = { "Arcane Intellect", "Arcane Brilliance" }, id = 1459, gid = 23028 },
         { key = "dampen",    label = "Dampen Magic",     names = { "Dampen Magic" },  id = 604 },
         { key = "amplify",   label = "Amplify Magic",    names = { "Amplify Magic" }, id = 1008 },
     },
     PALADIN = {
         { key = "might",  label = "Blessing of Might",  icon = "Interface\\Icons\\Spell_Holy_FistOfJustice",
-          names = { "Blessing of Might", "Greater Blessing of Might" }, id = 19740 },
+          names = { "Blessing of Might", "Greater Blessing of Might" }, id = 19740, gid = 25782 },
         { key = "wisdom", label = "Blessing of Wisdom", icon = "Interface\\Icons\\Spell_Holy_SealOfWisdom",
-          names = { "Blessing of Wisdom", "Greater Blessing of Wisdom" }, id = 19742 },
+          names = { "Blessing of Wisdom", "Greater Blessing of Wisdom" }, id = 19742, gid = 25894 },
         { key = "kings",  label = "Blessing of Kings",  icon = "Interface\\Icons\\Spell_Magic_MageArmor",
-          names = { "Blessing of Kings", "Greater Blessing of Kings" }, id = 20217 },
+          names = { "Blessing of Kings", "Greater Blessing of Kings" }, id = 20217, gid = 25898 },
         { key = "salvation", label = "Blessing of Salvation",
-          names = { "Blessing of Salvation", "Greater Blessing of Salvation" }, id = 1038 },
+          names = { "Blessing of Salvation", "Greater Blessing of Salvation" }, id = 1038, gid = 25895 },
         { key = "light",     label = "Blessing of Light",
-          names = { "Blessing of Light", "Greater Blessing of Light" }, id = 19977 },
+          names = { "Blessing of Light", "Greater Blessing of Light" }, id = 19977, gid = 25890 },
         { key = "sanctuary", label = "Blessing of Sanctuary",
-          names = { "Blessing of Sanctuary", "Greater Blessing of Sanctuary" }, id = 20911 },
+          names = { "Blessing of Sanctuary", "Greater Blessing of Sanctuary" }, id = 20911, gid = 25899 },
         { key = "devotion",      label = "Devotion Aura",          names = { "Devotion Aura" },          id = 465 },
         { key = "retribution",   label = "Retribution Aura",       names = { "Retribution Aura" },       id = 7294 },
         { key = "concentration", label = "Concentration Aura",     names = { "Concentration Aura" },     id = 19746 },
@@ -63,11 +69,11 @@ ns.CLASS_BUFFS = {
     },
     PRIEST = {
         { key = "fortitude", label = "Fortitude",     icon = "Interface\\Icons\\Spell_Holy_WordFortitude",
-          names = { "Power Word: Fortitude", "Prayer of Fortitude" }, id = 1243 },
+          names = { "Power Word: Fortitude", "Prayer of Fortitude" }, id = 1243, gid = 21562 },
         { key = "spirit",    label = "Divine Spirit", icon = "Interface\\Icons\\Spell_Holy_DivineSpirit",
-          names = { "Divine Spirit", "Prayer of Spirit" }, id = 14752 },
+          names = { "Divine Spirit", "Prayer of Spirit" }, id = 14752, gid = 27681 },
         { key = "shadowprot", label = "Shadow Protection",
-          names = { "Shadow Protection", "Prayer of Shadow Protection" }, id = 976 },
+          names = { "Shadow Protection", "Prayer of Shadow Protection" }, id = 976, gid = 27683 },
         { key = "fearward",   label = "Fear Ward", names = { "Fear Ward" }, id = 6346 },
     },
     ROGUE = {},   -- nothing a Rogue casts on other players that is worth flagging
@@ -301,6 +307,43 @@ end
 function ns.ClassColor(token)
     local c = token and _G.RAID_CLASS_COLORS and _G.RAID_CLASS_COLORS[token]
     if c then return c.r, c.g, c.b end
+end
+
+-- Every name a tracked entry's aura may go by on THIS client: the English names it carries, and what the
+-- client calls the spell ids behind it (a listed buff's single and group spells, and any id the entry was
+-- added with). Asking the client for a name can fail until its spell data has loaded, so a list that is
+-- missing one is not kept for good: it is asked again on later checks (twenty, about ten seconds), then kept as it is.
+local nameCache, nameTries = {}, {}
+function ns.MatchNames(entry)
+    local cached = nameCache[entry.key]
+    if cached then return cached end
+    local out, seen = {}, {}
+    local function add(n)
+        if type(n) == "string" and n ~= "" and not seen[n] then seen[n] = true; out[#out + 1] = n end
+    end
+    for _, n in ipairs(entry.names or {}) do add(n) end
+    local complete = true
+    local function ask(id)
+        if not id then return end
+        local name = ns.SpellNameAndIcon(id)
+        if name then add(name) else complete = false end
+    end
+    local preset = ns.FindPreset(entry.key)
+    if preset then ask(preset.id); ask(preset.gid) end
+    for _, id in ipairs(entry.ids or {}) do ask(id) end
+    nameTries[entry.key] = (nameTries[entry.key] or 0) + 1
+    if complete or nameTries[entry.key] >= 20 then nameCache[entry.key] = out end
+    return out
+end
+function ns.ResetMatchNames() for k in pairs(nameCache) do nameCache[k] = nil end for k in pairs(nameTries) do nameTries[k] = nil end end
+
+-- What to call a listed buff on screen: the client's own name for its spell on a client in another
+-- language (so the list reads like the rest of the game), the English label otherwise.
+function ns.BuffLabel(preset)
+    local locale = _G.GetLocale and GetLocale() or "enUS"
+    if locale == "enUS" or locale == "enGB" then return preset.label end
+    local name = preset.id and ns.SpellNameAndIcon(preset.id)
+    return name or preset.label
 end
 
 -- The icon for a buff: the literal path when it has one, else whatever the client says
